@@ -1,0 +1,22 @@
+# Default dual-branch architecture.
+#
+# Bands are named, never positional. At 1200 Hz with level 4: A4 = 0-37.5 Hz,
+# D4 = 37.5-75, D3 = 75-150, D2 = 150-300, D1 = 300-600 Hz. The prototype's
+# "details[0] = highest frequency" and "details[2] = D3" were both wrong; see
+# docs/legacy_crosswalk.md.
+model_id: dual_branch_wavelet_cnn
+model_overrides:
+  emg:
+    in_channels: 4
+    wavelet: {wavelet: db4, level: 4, bands: [A4, D3, D1], mode: symmetric}
+    hidden_channels: [8, 16]
+    kernel_size: 3
+    pool_size: 2
+  mic:
+    in_channels: 1
+    wavelet: {wavelet: coif5, level: 5, bands: [A5, D3, D1], mode: symmetric}
+    hidden_channels: [4, 8]
+    kernel_size: 3
+    pool_size: 2
+  fusion_hidden: [48, 32]
+  dropout: 0.5

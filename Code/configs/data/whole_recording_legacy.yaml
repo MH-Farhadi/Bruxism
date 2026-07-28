@@ -1,0 +1,17 @@
+# DIAGNOSTIC ONLY -- UNSAFE FOR INFERENCE.
+#
+# Reproduces the research prototype's whole-file, filename-based labelling so historical
+# window counts can be explained. Every artifact produced under this policy carries
+# safe_for_inference = false. Do not report any result from it as a scientific finding.
+name: whole_recording_legacy
+description: Filename labelling of entire recordings; ignores the trigger. Provenance only.
+data:
+  data_root: ../Data
+  sampling_rate_hz: 1200
+  segmentation_policy: whole_recording_legacy
+  window_seconds: 1.0
+  stride_seconds: 0.5
+  guard_seconds: 0.0
+  startup_guard_seconds: 0.0
+  shutdown_guard_seconds: 0.0
+  cache_dir: outputs/cache

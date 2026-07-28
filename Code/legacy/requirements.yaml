@@ -1,0 +1,19 @@
+name: bruxism-detection
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.8
+  - pytorch>=1.12.0
+  - numpy>=1.21.0
+  - matplotlib>=3.5.0
+  - scipy>=1.8.0
+  - scikit-learn>=1.0.0
+  - pandas>=1.3.0
+  - pywavelets>=1.3.0
+  - pip
+  - pip:
+    # PyWavelets can also be installed via pip if preferred
+    # - PyWavelets>=1.3.0
+

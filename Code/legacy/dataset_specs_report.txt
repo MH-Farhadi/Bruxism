@@ -1,0 +1,100 @@
+================================================================================
+BRUXISM DATASET SPECIFICATIONS REPORT
+================================================================================
+
+This report describes the RAW dataset BEFORE any preprocessing or class reduction.
+
+DATASET OVERVIEW
+--------------------------------------------------------------------------------
+Data root: C:\Users\mhfar\Desktop\Depo\Brusxism_data
+Total files: 100
+Total samples: 7,167,600
+Total duration: 5973.00 seconds (99.55 minutes)
+Unique subjects: 5
+Unique conditions: 12
+
+SIGNAL SPECIFICATIONS
+--------------------------------------------------------------------------------
+EMG Channels: 4
+  - EMG1_1-2
+  - EMG2_3-4
+  - EMG3_5-6
+  - EMG4_7-8
+MIC Channel: Mic
+Sampling rate: 1200 Hz (default, may vary per file)
+
+ORIGINAL CLASSES (12 classes, before reduction)
+--------------------------------------------------------------------------------
+  Class  0: rest                      -   5 files,  360,000 samples
+  Class  1: open_close                -   5 files,  360,000 samples
+  Class  2: deviation_left_right      -   5 files,  360,000 samples
+  Class  3: protrusion_retrusion      -   5 files,  360,000 samples
+  Class  4: bite_left                 -   5 files,  360,000 samples
+  Class  5: bite_right                -   5 files,  360,000 samples
+  Class  6: molar_clench              -   5 files,  360,000 samples
+  Class  7: incisor_clench            -   5 files,  360,000 samples
+  Class  8: natural_bruxing           -  15 files, 1,070,880 samples
+  Class  9: cheese                    -  15 files, 1,056,720 samples
+  Class 10: carrots                   -  15 files, 1,080,000 samples
+  Class 11: gum                       -  15 files, 1,080,000 samples
+
+EMG STATISTICS (raw values, all channels combined)
+--------------------------------------------------------------------------------
+  EMG1_1-2:
+    Count: 7,167,600 samples
+    Mean: 0.0006
+    Std: 204.6349
+    Range: [-69362.5156, 62083.6797]
+  EMG2_3-4:
+    Count: 7,167,600 samples
+    Mean: 0.0008
+    Std: 303.0789
+    Range: [-64615.2461, 52630.6445]
+  EMG3_5-6:
+    Count: 7,167,600 samples
+    Mean: -0.0013
+    Std: 201.7848
+    Range: [-69240.2734, 65409.2266]
+  EMG4_7-8:
+    Count: 7,167,600 samples
+    Mean: 0.0003
+    Std: 207.5597
+    Range: [-63428.1953, 58960.0156]
+
+MIC STATISTICS (raw values)
+--------------------------------------------------------------------------------
+  Count: 7,167,600 samples
+  Mean: 129.2553
+  Std: 31.5883
+  Range: [50.0000, 227.0000]
+
+WINDOWING SPECIFICATIONS
+--------------------------------------------------------------------------------
+Window size: 1200 samples (1.00 seconds)
+Stride: 600 samples (0.50 seconds)
+Overlap: 50.0%
+Total windows: 11,845
+
+WINDOWS PER CONDITION (before class reduction)
+--------------------------------------------------------------------------------
+  Class  0: rest                      -    595 windows
+  Class  1: open_close                -    595 windows
+  Class  2: deviation_left_right      -    595 windows
+  Class  3: protrusion_retrusion      -    595 windows
+  Class  4: bite_left                 -    595 windows
+  Class  5: bite_right                -    595 windows
+  Class  6: molar_clench              -    595 windows
+  Class  7: incisor_clench            -    595 windows
+  Class  8: natural_bruxing           -  1,769 windows
+  Class  9: cheese                    -  1,746 windows
+  Class 10: carrots                   -  1,785 windows
+  Class 11: gum                       -  1,785 windows
+
+SUBJECT DISTRIBUTION
+--------------------------------------------------------------------------------
+  Subject 1: 20 files, 1,440,000 samples, 12 conditions
+  Subject 2: 20 files, 1,430,880 samples, 12 conditions
+  Subject 3: 20 files, 1,440,000 samples, 12 conditions
+  Subject 4: 20 files, 1,440,000 samples, 12 conditions
+  Subject 5: 20 files, 1,416,720 samples, 12 conditions
+

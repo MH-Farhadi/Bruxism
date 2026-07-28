@@ -1,0 +1,114 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bruxism"
+version = "0.1.0"
+description = "Reproducible classification of instructed awake jaw / tooth-contact tasks from surface EMG and audio"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11,<3.14"
+authors = [{ name = "Bruxism study team" }]
+keywords = ["emg", "audio", "wavelet", "leave-one-subject-out", "reproducibility"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+# Version floors are set to the oldest release whose behaviour this code relies on.
+#   scipy>=1.14        : stable `iirnotch`/`butter`/`filtfilt` semantics used by preprocessing.filters
+#   scikit-learn>=1.5  : FastICA(whiten_solver=...) is available from 1.2; 1.5 pins the
+#                        `compute_class_weight`/metrics behaviour the evaluation module assumes.
+#   PyWavelets>=1.6    : `wavedec` coefficient ordering + `frequency2scale`/`scale2frequency`
+#   numpy>=1.26        : NumPy 2 compatible call sites only
+dependencies = [
+  "numpy>=1.26,<3",
+  "scipy>=1.14,<2",
+  "pandas>=2.1,<3",
+  "pyarrow>=17",
+  "scikit-learn>=1.5,<2",
+  "PyWavelets>=1.6,<2",
+  "torch>=2.2,<3",
+  "matplotlib>=3.8,<4",
+  "PyYAML>=6,<7",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+video = ["opencv-python-headless>=4.10"]
+dev = [
+  "pytest>=8",
+  "pytest-cov",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "pandas-stubs",
+  "types-PyYAML",
+]
+
+[project.scripts]
+bruxism-audit = "bruxism.cli.audit_dataset:main"
+bruxism-build-manifest = "bruxism.cli.build_manifest:main"
+bruxism-train = "bruxism.cli.run_nested_loso:main"
+bruxism-ablations = "bruxism.cli.run_ablations:main"
+bruxism-baselines = "bruxism.cli.run_baselines:main"
+bruxism-report = "bruxism.cli.make_paper_artifacts:main"
+bruxism-benchmark = "bruxism.cli.benchmark_models:main"
+bruxism-summarize = "bruxism.cli.summarize_runs:main"
+bruxism-plot-preprocessing = "bruxism.cli.plot_preprocessing:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bruxism = ["py.typed"]
+
+# ---------------------------------------------------------------- tooling ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "scripts", "tests"]
+extend-exclude = ["legacy", "outputs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RET", "ARG", "PTH", "NPY"]
+ignore = [
+  "E501",   # line length is enforced by the formatter
+  "B905",   # zip(strict=) noise on 3.10 targets
+  "SIM108", # ternary rewrites hurt readability in signal code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG001", "ARG002"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bruxism"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/bruxism"]
+ignore_missing_imports = true
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+exclude = "(legacy|outputs)/"
+
+[[tool.mypy.overrides]]
+module = ["pywt.*", "sklearn.*", "scipy.*", "cv2.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "slow: marks tests that take more than a few seconds",
+  "requires_data: marks tests that need an authorized private data root (skipped by default)",
+]
+filterwarnings = ["error::DeprecationWarning:bruxism.*"]

@@ -1,0 +1,30 @@
+# Approved segmentation policy.
+#
+# Trigger semantics were confirmed by the investigator on 2026-07-27: Trigger == 1 marks
+# intervals during which the participant was actively performing the named task. See
+# docs/experiment_protocol.md for the full decision record.
+#
+# guard_seconds is 0.25 s rather than the 0.5 s the brief suggested as a starting point.
+# The audit (outputs/data_audit/<hash>/guard_sensitivity.csv) shows that at 0.5 s some
+# participant x class cells collapse to 1-3 windows, because participants marked the
+# trigger at very different granularities. 0.25 s still keeps every window wholly inside a
+# trigger-active interval and a quarter-second clear of any transition. THIS VALUE NEEDS
+# INVESTIGATOR SIGN-OFF (docs/open_questions.md Q1b).
+name: trigger_constrained
+description: Windows wholly inside approved trigger-active intervals; rest from dedicated recordings.
+data:
+  data_root: ../Data
+  sampling_rate_hz: 1200
+  segmentation_policy: trigger_constrained
+  window_seconds: 1.0
+  stride_seconds: 0.5
+  guard_seconds: 0.25
+  # 0.5 s covers every measured amplifier-settling transient (max observed 0.40 s); it
+  # replaces the prototype's unexplained blanket 3 s skip.
+  startup_guard_seconds: 0.5
+  shutdown_guard_seconds: 0.0
+  # Trigger-off intervals of ACTIVE recordings are NOT treated as rest. Their meaning
+  # (transition? instruction? unobserved activity?) is unconfirmed.
+  allow_trigger_off_as_rest: false
+  emg_channels: null      # null = all four recorded differential channels
+  cache_dir: outputs/cache

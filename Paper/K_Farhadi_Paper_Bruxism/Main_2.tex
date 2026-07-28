@@ -1,0 +1,825 @@
+%%%% Scientific Reports (Nature Portfolio) submission %%%%
+%%%% Clean revised manuscript. Reference style: sn-nature. %%%%
+%%%% Add "lineno" to the class options for a line-numbered review copy. %%%%
+%%%% In the delivered comparison copy, blue text marks additions or wording changed relative to the uploaded original; deleted text is omitted. %%%%
+\documentclass[pdflatex,sn-nature,iicol]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{mathrsfs}
+\usepackage[title]{appendix}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{manyfoot}
+\usepackage{indentfirst}
+
+\graphicspath{{./}{figures/}{Figures/}}
+\providecommand{\Description}[1]{}
+\newcommand{\TBD}[1]{\textcolor{blue}{\textbf{[TBD: #1]}}}
+
+\begin{document}
+\color{black}
+
+\color{blue}
+\title[Audio--EMG Classification of Instructed Jaw Activities]{Audio--EMG Fusion with Dual-Branch Wavelet CNNs for Classifying Instructed Jaw Activities Relevant to Tooth-Contact Bruxism}
+\color{black}
+
+\author[1]{\fnm{Mohammad Hassan} \sur{Farhadi}}
+\author[1]{\fnm{Ali} \sur{Rabiee}}
+\author[1]{\fnm{Rahul} \sur{Singh}}
+\author[2,3]{\fnm{Mariusz P.} \sur{Furmanek}}
+\author*[1]{\fnm{Reza} \sur{Abiri}}\email{reza\_abiri@uri.edu}
+\author*[4]{\fnm{Theodore A.} \sur{Walls}}\email{walls@uri.edu}
+
+\color{blue}
+\affil[1]{\orgdiv{Department of Electrical, Computer, and Biomedical Engineering}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\color{black}
+\affil[2]{\orgdiv{Department of Physical Therapy}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\color{blue}
+\affil[3]{\orgdiv{Institute of Sport Sciences, Academy of Physical Education in Katowice}, \orgaddress{\city{Katowice}, \country{Poland}}}
+\color{black}
+\affil[4]{\orgdiv{Department of Psychology}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+
+\color{blue}
+\abstract{Current consensus defines bruxism as masticatory-muscle activity that may include clenching or grinding with tooth contact and bracing or thrusting without tooth contact. A device that classifies instructed tooth-contact tasks therefore does not, by itself, diagnose bruxism. Here, we report a proof-of-concept engineering study of whether surface electromyography (EMG), audio, and a dual-branch wavelet convolutional neural network can distinguish quiet rest from four instructed jaw-activity classes. Five adults with a prior clinical diagnosis of bruxism completed awake laboratory recordings of rest, jaw movement, clenching, grinding, and chewing. The activities were deliberately performed rather than observed spontaneously. In leave-one-subject-out evaluation, the fused five-class model achieved \TBD{five-class accuracy, XX.X\%}, \TBD{macro-F1, XX.X\%}, and \TBD{macro one-vs-rest ROC--AUC, 0.XXX}, compared with \TBD{EMG-only accuracy, XX.X\%}. A sensitivity analysis excluding chewing yielded \TBD{four-class accuracy, XX.X\%} and \TBD{macro-F1, XX.X\%} across rest, movement, clenching, and grinding. Collapsing the predictions post hoc into instructed clenching/grinding versus rest/movement/chewing yielded \TBD{binary accuracy, XX.X\%}, \TBD{F1, XX.X\%}, and \TBD{ROC--AUC, 0.XXX}. Adding rest addresses the earlier inability to evaluate activity windows against a quiet non-event condition. However, the rest data were recorded in a controlled laboratory and do not represent the full range of unrestricted background behavior. No spontaneous awake- or sleep-bruxism episodes were recorded. These results establish only the technical feasibility of multimodal classification of instructed jaw activities and quiet rest in this five-participant dataset; they do not establish continuous free-living event detection, population-level generalization, or clinical validity for diagnosing awake or sleep bruxism.}
+\color{black}
+
+\color{blue}
+\keywords{Jaw-activity classification, Tooth contact, Surface electromyography, Audio sensing, Convolutional neural networks, Wavelet decomposition, Sensor fusion}
+\color{black}
+
+\maketitle
+
+\color{black}
+\section{Introduction}
+
+\color{blue}
+Bruxism terminology has changed substantially. International consensus no longer defines bruxism simply as involuntary tooth grinding or clenching. Bruxism is a repetitive masticatory-muscle activity characterized by clenching or grinding of the teeth and/or by bracing or thrusting of the mandible~\cite{lobbezoo2018international,verhoeff2025definitions}. Sleep bruxism and awake bruxism are distinct circadian manifestations. Sleep bruxism consists of rhythmic (phasic) or non-rhythmic (tonic) masticatory-muscle activity during sleep, whereas awake bruxism consists of repetitive or sustained tooth contact and/or mandibular bracing or thrusting during wakefulness~\cite{verhoeff2025definitions}. Tooth contact is therefore neither necessary for all bruxism activities nor sufficient to establish that an observed activity is bruxism.
+
+Current frameworks also treat bruxism as a behavior whose clinical relevance depends on the individual and context, rather than as a disorder that is uniformly pathological. Bruxism activities may be neutral, may act as risk indicators for adverse oral-health outcomes, or may have protective associations in some circumstances~\cite{lobbezoo2018international,verhoeff2025definitions}. A recent biopsychosocial model emphasizes that biological, psychological, and social influences interact across the 24-hour cycle and that motor activity cannot be interpreted apart from the person's broader clinical context~\cite{manfredini2026biopsychosocial}. This wider perspective has led to the description of bruxism as a medical gateway for dentistry: careful assessment may connect oral findings with sleep, pain, psychological, medication-related, and other health factors, rather than reducing the problem to dental mechanics alone~\cite{manfredini2024evolution}.
+\color{black}
+
+\color{blue}
+Assessment must therefore be multidimensional. The Standardised Tool for the Assessment of Bruxism (STAB) combines subject-based report, clinical examination, instrumental assessment, possible consequences, and risk or associated factors~\cite{manfredini2024standardised}. Instrumental sensors can contribute objective information about muscle activity, but they represent only one component of this framework. This distinction is particularly important for temporomandibular disorders (TMDs). Bruxism and TMD are not interchangeable diagnoses, and the present study was not designed to evaluate TMD. The INfORM/IADR standard-of-care statement describes TMDs as heterogeneous, multifactorial biopsychosocial conditions whose diagnosis requires validated history and clinical assessment and whose management should generally be patient-centered, conservative, and reversible~\cite{inform2025tmd}. Accordingly, the presence of a jaw-muscle pattern alone should not be presented as a diagnosis of TMD or as proof that bruxism caused a patient's pain or dysfunction.
+\color{black}
+
+\color{blue}
+Recent surveys and educational reports show why precise terminology matters. Dental practitioners use heterogeneous bruxism assessment and management strategies, and outdated beliefs remain common even among trainees~\cite{mungia2025approaches,nasanen2026competence}. Similar educational gaps have been documented for TMDs~\cite{sangalli2026education}. Engineering studies can help address an important measurement problem, but only if the output of a classifier is separated clearly from a clinical diagnosis.
+\color{black}
+
+\color{blue}
+Instrumental assessment outside the clinic remains technically challenging. Surface EMG is sensitive to masticatory-muscle activation but can respond similarly to functional and non-functional activities. Audio may add information about tooth contact and mastication, but it is also sensitive to ambient noise and raises privacy considerations. Natural behaviors fluctuate within and across days; ecological momentary assessment (EMA) studies have therefore used repeated sampling in the natural environment rather than relying on a single retrospective report~\cite{bracci2018frequency,colonna2025fluctuation}. Proposed research routes for awake-bruxism metrics combine subject-based, clinically based, EMA, and instrumental approaches and emphasize matching the measurement method to the research question~\cite{bracci2024metrics}. Multi-day, 24-hour EMG recording has also been proposed for characterizing muscle activity in the home environment~\cite{colonna2023electromyographic}.
+\color{black}
+
+\color{blue}
+Against this background, the present study addresses a narrow engineering question. It does not evaluate spontaneous awake bruxism, sleep bruxism, disease severity, TMD, or treatment response. Instead, it tests whether an audio--EMG system can distinguish quiet rest and four instructed jaw activities performed in a controlled laboratory by five adults with a prior clinical diagnosis of bruxism. The activity labels describe the experimental conditions, not independently adjudicated bruxism episodes.
+\color{black}
+
+\color{blue}
+The study addresses three research questions:
+\color{black}
+
+\begin{itemize}
+\color{blue}
+    \item \textbf{RQ1:} Can off-the-shelf surface EMG and microphone sensors provide signals that support five-class classification of quiet rest, jaw movement, clenching, grinding, and chewing?
+    \item \textbf{RQ2:} Within this dataset, how much does audio add to EMG, and is the improvement concentrated in the chewing class?
+    \item \textbf{RQ3:} Does a dual-branch CNN with modality-specific wavelet decomposition outperform the evaluated single-pathway and conventional baselines under the same leave-one-subject-out protocol, including when the task is collapsed to instructed clenching/grinding versus the three comparison conditions?
+\color{black}
+\end{itemize}
+
+\color{black}
+\section{Prior technical advances}
+
+\color{blue}
+\subsection{EMG-based assessment}
+\color{black}
+
+\color{blue}
+Surface EMG is widely used for ambulatory assessment because it measures masticatory-muscle activation directly~\cite{raez2006techniques}. Early portable systems established the feasibility of home recording but had limited specificity for distinguishing target activity from other orofacial activity~\cite{stuginski2016detection}. Castroflorio et al.~\cite{castroflorio2013use} combined EMG and electrocardiographic information to identify sleep-bruxism episodes in a natural environment.
+\color{black}
+
+\color{blue}
+Machine-learning studies have reported high performance on controlled tasks, although direct comparison is difficult when labels, participants, and validation protocols differ. Sonmezocak and Kurt~\cite{sonmezocak2021detection}, for example, reported greater than 90\% accuracy using EMG features across jaw opening, clenching, rhythmic grinding, and fatigue/pain classes. Gul et al.~\cite{gul2024advanced} evaluated sleep-related recordings across postures, while Heyat et al.~\cite{heyat2020computational} combined several physiological modalities. Lan et al.~\cite{lan2022comparative} described different surface-EMG patterns during centric and eccentric instructed activities. These studies support technical feasibility but do not make their reported accuracies interchangeable, because some classify pre-segmented tasks whereas others aim to identify events within continuous recordings.
+\color{black}
+
+\color{blue}
+\subsection{Acoustic and wearable sensing}
+\color{black}
+
+\color{blue}
+Acoustic sensing may complement EMG when oral activities produce different sound patterns. Romano et al.~\cite{romano2024wearable} showed that signals from voluntary oral behaviors depend strongly on transducer location and identified ear-adjacent placement as promising for longer recordings. Martinot et al.~\cite{martinot2021artificial} used mandibular-movement analysis to identify phasic sleep-bruxism events in patients with obstructive sleep apnea. Patented systems have also used adaptive sound thresholds or chin-mounted accelerometers~\cite{haugland2020automatic,patwa2017bruxism}. For sleep applications, however, portable devices require comparison with an appropriate sleep reference method; a controlled awake-task classifier cannot be assumed to transfer to sleep~\cite{cidverdejo2024instrumental}.
+\color{black}
+
+\color{blue}
+\subsection{Signal processing and deep learning}
+\color{black}
+
+\color{blue}
+Wavelet decomposition is well suited to non-stationary EMG because it preserves joint time--frequency information~\cite{englehart2003robust}. Wavelet features have performed well in EMG classification~\cite{phinyomark2012feature}, and filter design remains important for preserving physiological content while suppressing noise~\cite{chowdhury2013surface}. CNNs can learn local patterns in physiological signals~\cite{faust2018deep,tsinganos2019improved}. Focal loss and class-weighting methods can reduce the influence of class imbalance~\cite{lin2017focal,johnson2019survey}. The remaining engineering gap addressed here is whether modality-specific wavelet branches improve classification of quiet rest and the four instructed activities in the present dataset.
+\color{black}
+
+\color{blue}
+\section{Methods}
+\color{black}
+
+\color{blue}
+This proof-of-concept study was approved by the Institutional Review Board of the University of Rhode Island (Protocol \#IRB22275690-2). All methods were performed in accordance with relevant institutional guidelines and regulations. Written informed consent was obtained from every participant, including consent to publish the identifying image in Fig.~\ref{fig:sensor_setup}.
+\color{black}
+
+\color{blue}
+\subsection{Participants and study scope}
+\color{black}
+
+\color{blue}
+Five adults (2 women and 3 men; age $38.0 \pm 10.4$ years) were recruited through flyers, messages to local oral-care and physical-therapy providers, and word of mouth. Eligibility required a prior clinical diagnosis of bruxism. The study did not independently re-diagnose or phenotype that history, and the available study records did not stratify participants by sleep bruxism, awake bruxism, grinding, bracing, or thrusting predominance. The prior diagnosis therefore describes the sample but is not a reference standard for the activity labels used in this analysis.
+\color{black}
+
+\color{blue}
+% AUTHOR ACTION REQUIRED BEFORE RESUBMISSION:
+% If the study records contain this information, state who made the prior
+% diagnosis, the criteria/tool used, when it was made, and whether each
+% participant had awake bruxism, sleep bruxism, or both. Do not infer a
+% phenotype retrospectively. If those details are unavailable, retain the
+% limitation exactly as written.
+\color{black}
+
+\color{blue}
+All analyzed tasks were performed intentionally while participants were awake in the laboratory. The study did not record spontaneous awake-bruxism episodes or sleep. Consequently, the labels ``clenching'' and ``grinding'' below refer to instructed task performance. They should not be interpreted as natural or independently verified bruxism episodes.
+\color{black}
+
+\color{blue}
+\subsection{Experimental procedure}
+\color{black}
+
+\color{blue}
+The session began with written consent and a pre-screening survey. Surface EMG electrodes, an omnidirectional microphone, and a camera were positioned and secured. Participants first completed 1 minute of quiet rest. They then performed five repetitions of jaw opening/closing, left/right deviation, protrusion/retrusion, and left/right biting. This was followed by 1-minute trials of isometric molar and incisor clenching, alternating 3 seconds of activity with 3 seconds of relaxation.
+\color{black}
+
+\color{blue}
+After a break, participants completed 3-minute trials of instructed grinding, chewing cheese, chewing baby carrots or popcorn, and chewing gum. Each task was repeated three times, with a 1-minute rest between repetitions. A handheld button transmitted event markers synchronized with the physiological recordings. Participants pressed the button at task initiation, and the experimenter visually confirmed task onset. A 0.5-second interval around each transition was excluded to reduce boundary ambiguity.
+\color{black}
+
+\color{blue}
+The button and task protocol established experimental task labels, not clinical bruxism labels. Quiet-rest windows were extracted from the initial 1-minute baseline and from clearly labeled inter-trial rest intervals. The same 0.5-second exclusion around transitions was applied before rest windows were generated. Rest windows with visible task carryover, speech, swallowing, experimenter interaction, or recording artifact were \TBD{state whether excluded manually and give the adjudication procedure}. The resulting rest class represents quiet laboratory rest only. It does not sample the full range of everyday non-event behaviors and therefore does not turn this window classifier into a validated continuous detector.
+
+\subsection{Sensors and dataset}
+
+Two bipolar surface-EMG channel pairs were positioned over the unilateral masseter and temporalis muscles. One omnidirectional microphone was positioned near the temporomandibular joint (Fig.~\ref{fig:sensor_setup}). All signals were sampled at 1200~Hz.
+
+% AUTHOR ACTION REQUIRED FOR REPRODUCIBILITY:
+% Add manufacturer/model for the EMG amplifier, electrodes, microphone,
+% acquisition interface, and synchronization/button hardware; electrode
+% material, diameter, inter-electrode distance, reference/ground placement,
+% tested side and how that side was selected; analog gain, ADC resolution,
+% input range, and any hardware filters. These details are not present in the
+% supplied manuscript and must not be guessed.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{Figures/patient_new.png}
+  \caption{Sensor placement for multimodal data acquisition. Bipolar surface-EMG electrode pairs were positioned over the temporalis (EMG-T) and masseter (EMG-M) muscles. A microphone (MIC) was secured near the temporomandibular joint. This arrangement was evaluated only during instructed awake laboratory tasks.}
+  \Description{A participant with surface-EMG electrodes over the jaw muscles and a microphone positioned near the temporomandibular joint.}
+  \label{fig:sensor_setup}
+\end{figure}
+
+The recordings were consolidated into five experimental classes. \textbf{Rest} included quiet baseline and eligible inter-trial rest windows. \textbf{Movement} included opening/closing, lateral deviation, and protrusion/retrusion. \textbf{Clenching} included molar clench, incisor clench, and unilateral left/right bite. \textbf{Grinding} included the instructed grinding trials. \textbf{Chewing} included cheese, carrots or popcorn, and gum. These categories were selected to contrast quiet non-event periods, static loading, lateral tooth-contact activity, non-chewing jaw movement, and functional mastication. They were not intended as a comprehensive taxonomy of bruxism. In particular, mandibular bracing and thrusting without tooth contact were not elicited as distinct classes.
+
+Chewing was included because it is a common functional activity and a plausible confound for an ambulatory jaw-activity classifier. Because it may also be comparatively easy to recognize, the primary five-class results are accompanied by a sensitivity analysis that excludes chewing. A second analysis collapses the five labels into instructed clenching/grinding versus rest/movement/chewing.
+
+Continuous signals were segmented into 1.0-second windows (1200 samples) with a 0.5-second stride (600 samples), creating 50\% overlap between adjacent windows. The four activity classes contributed the original 11,845 windows, and the newly included rest class contributed \TBD{rest windows, X,XXX}, for a five-class total of \TBD{total windows, XX,XXX}. These windows are not independent observations: adjacent windows overlap and many windows originate from each of only five participants. The participant, rather than the window, therefore defines the effective unit for population-level generalization.
+
+\begin{table}[h]
+  \caption{Dataset characteristics.}
+  \label{tab:dataset}
+  \centering
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}ll@{}}
+    \toprule
+    Property & Value \\
+    \midrule
+    Participants & 5 \\
+    EMG channels & 2 \\
+    Microphone channels & 1 \\
+    Sampling rate & 1200 Hz \\
+    Window size & 1200 samples (1.0 s) \\
+    Stride & 600 samples (0.5 s) \\
+    Original activity windows & 11,845 \\
+    Rest windows & \TBD{X,XXX} \\
+    Total analyzed windows & \TBD{XX,XXX} \\
+    Experimental classes & 5 \\
+    Quiet-rest class & Included \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\subsection{Preprocessing and wavelet decomposition}
+
+The EMG pipeline included a 60-Hz notch filter with quality factor $Q=30$, a fourth-order Butterworth bandpass filter from 20 to 450~Hz, high-pass baseline correction at 5~Hz, and normalization using statistics calculated only from the training participants~\cite{chowdhury2013surface}. Figure~\ref{fig:emg_preprocessing} illustrates these stages. The microphone signal underwent mean subtraction and normalization using training-set statistics; no additional frequency filter was applied.
+
+% AUTHOR ACTION REQUIRED FOR REPRODUCIBILITY:
+% State whether filters were causal or zero-phase, the implementation/library
+% and version, filter order for the 5-Hz stage, wavelet boundary mode, exact
+% coefficient handling/resampling, and software versions.
+
+\begin{figure*}[h]
+\color{black}
+  \centering
+\color{blue}
+  \includegraphics[width=0.95\linewidth]{Figures/bite left channel 4 emg.png}
+  \caption{EMG preprocessing for one 1-second window: raw signal, 60-Hz notch filtering, 20--450-Hz bandpass filtering with baseline removal, and normalization before wavelet decomposition.}
+  \label{fig:emg_preprocessing}
+\end{figure*}
+
+EMG signals were decomposed using the Daubechies-4 wavelet at four levels. The EMG sub-branches used $A_4$ (low), $D_3$ (mid), and $D_1$ (high). Because the bandpass filter attenuated content above 450~Hz, $D_1$ represented the retained 300--450-Hz component. Daubechies wavelets were selected because of their compact support and prior use in transient EMG analysis~\cite{englehart2003robust}. Audio signals were decomposed using the Coiflet-5 wavelet at five levels, selected in preliminary testing for its time--frequency representation of transient acoustic features~\cite{bharathi2025unveiling}.
+
+\subsection{Model architecture}
+
+The model processed EMG and audio in separate branches before fusion (Fig.~\ref{fig:architecture}). The EMG branch contained three CNN sub-branches for low-, mid-, and high-frequency coefficients. Each sub-branch used two convolutional layers with 8 and 16 channels, batch normalization, rectified-linear-unit activation, and adaptive pooling, producing 48 EMG features. The audio branch used an analogous structure with 4 and 8 channels and produced 24 features.
+\color{black}
+
+\color{blue}
+The 72 concatenated features were passed to a fusion multilayer perceptron (MLP) with dimensions $72\rightarrow48\rightarrow32\rightarrow5$. Batch normalization, rectified-linear-unit activation, and dropout with probability 0.6 were applied in the hidden layers. The final layer produced scores for rest, movement, clenching, grinding, and chewing.
+
+% AUTHOR ACTION REQUIRED FOR REPRODUCIBILITY:
+% Add every convolution kernel size, stride, padding rule, pooling operation
+% and output length, parameter initialization, and the exact trainable
+% parameter count. A layer-by-layer supplementary table is the clearest format.
+
+\begin{figure*}[t]
+  \centering
+  \IfFileExists{Figures/pipeline_5class.png}
+    {\includegraphics[width=0.75\textwidth]{Figures/pipeline_5class.png}}
+    {\fbox{\parbox[c][5cm][c]{0.72\textwidth}{\centering\TBD{Update the architecture diagram to show a five-output classification head and save it as Figures/pipeline\_5class.png}}}}
+  \caption{Dual-branch five-class architecture. EMG and audio underwent modality-specific wavelet decomposition before processing by parallel CNN branches. Extracted features were concatenated and classified by a fusion MLP with outputs for rest, movement, clenching, grinding, and chewing.}
+  \Description{Separate EMG and audio wavelet-CNN pathways merge in a five-output fusion multilayer perceptron.}
+  \label{fig:architecture}
+\end{figure*}
+
+\subsection{Training and evaluation}
+
+To address class imbalance after adding rest, the model used focal loss~\cite{lin2017focal} with focusing parameter \TBD{$\gamma$ value}, inverse-frequency class weights recomputed within each outer training fold, and augmentation of minority-class training windows by amplitude scaling of $\pm10\%$, Gaussian-noise injection, and circular shifts of $\pm50$ samples. Augmentation was applied only within the training partition of each fold. Rest windows were \TBD{state whether augmented; ordinarily not augmented unless this was actually done}.
+
+Optimization used Adam with learning rate \TBD{reselected learning rate}, weight decay \TBD{reselected weight decay}, gradient clipping at norm 1.0, and batch size \TBD{reselected batch size}. A ReduceLROnPlateau scheduler reduced the learning rate by a factor of 0.5 after \TBD{patience} epochs without improvement, to a minimum of $10^{-6}$. Early stopping with patience \TBD{early-stopping patience} was enabled after \TBD{minimum epochs} epochs.
+
+Evaluation used leave-one-subject-out (LOSO) folds: in each fold, four participants were used for model development and the fifth was held out for testing. Hyperparameters were selected by five-fold cross-validation within the training participants, maximizing macro-F1. No held-out participant's windows were used for normalization, augmentation, hyperparameter selection, or training.
+
+% AUTHOR ACTION REQUIRED FOR REPRODUCIBILITY:
+% Specify whether inner folds were grouped by participant or recording trial,
+% list the complete hyperparameter search grid, validation split rule,
+% augmentation probabilities, random seed(s), number of independent training
+% runs per outer fold, software/framework versions, and training hardware.
+
+Accuracy and macro-averaged precision, recall, F1, and one-vs-rest ROC--AUC are reported for the five-class task by pooling the held-out predictions from the five LOSO folds. Per-class metrics, class-specific one-vs-rest AUC, and held-out-participant point estimates are also reported. AUC was calculated from held-out class probabilities, not from hard labels. McNemar tests on paired window predictions and bootstrap intervals over windows were examined during exploratory analysis, but the windows are clustered and overlapping. Such window-level tests do not provide valid population-level inference with five participants and are therefore not used as the basis for the manuscript's conclusions.
+
+Two transparent secondary analyses were computed from the pooled five-class predictions. First, chewing was excluded, and accuracy plus four-class macro metrics were recomputed for rest, movement, clenching, and grinding. Second, predictions and probabilities were collapsed into instructed clenching/grinding versus rest/movement/chewing. The second analysis provides a binary comparison against quiet rest and other instructed activities, but it is still not a clinical bruxism-detection analysis because the positive tasks were elicited and the background class does not include unrestricted free-living behavior.
+
+% AUTHOR ACTION REQUIRED BEFORE RESUBMISSION:
+% Reviewer 3 requested AUC. Replace all AUC placeholders only from saved
+% held-out LOSO probabilities. Calculate five-class macro one-vs-rest AUC,
+% class-specific AUCs, the collapsed binary AUC, and participant-level AUCs.
+% State whether probabilities were calibrated. Never derive AUC from a confusion
+% matrix or hard labels.
+
+\begin{table}[h]
+  \caption{Hyperparameters for the evaluated methods.}
+  \label{tab:hyperparameters}
+  \centering
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lll@{}}
+    \toprule
+    Method & Hyperparameter & Value \\
+    \midrule
+    \multirow{7}{*}{\shortstack[l]{Wavelet dual-\\branch CNN}}
+      & Learning rate & \TBD{value} \\
+      & Weight decay & \TBD{value} \\
+      & Dropout & \TBD{value} \\
+      & Batch size & \TBD{value} \\
+      & Focal-loss $\gamma$ & \TBD{value} \\
+      & Early-stop patience & \TBD{value} \\
+      & Scheduler patience & \TBD{value} \\
+    \midrule
+    \multirow{5}{*}{\shortstack[l]{Bidirectional\\LSTM}}
+      & Hidden dimensions & 32 \\
+      & Number of layers & 2 \\
+      & Dropout & 0.5 \\
+      & Learning rate & $1\times10^{-4}$ \\
+      & Batch size & 32 \\
+    \midrule
+    \multirow{4}{*}{\shortstack[l]{Random\\forest}}
+      & Estimators & 200 \\
+      & Maximum depth & 20 \\
+      & Minimum split & 5 \\
+      & Class weight & Balanced \\
+    \midrule
+    \multirow{4}{*}{\shortstack[l]{MLP with\\static features}}
+      & Hidden layers & [128, 64] \\
+      & Dropout & 0.5 \\
+      & Learning rate & $1\times10^{-3}$ \\
+      & Batch size & 32 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\section{Results}
+
+\subsection{Five-class performance and modality ablation}
+
+The dual-branch wavelet CNN achieved \TBD{five-class accuracy, XX.X\%}, \TBD{macro precision, XX.X\%}, \TBD{macro recall, XX.X\%}, \TBD{macro F1, XX.X\%}, and \TBD{macro one-vs-rest ROC--AUC, 0.XXX} on the pooled held-out LOSO predictions (Table~\ref{tab:results}). Under the same evaluation setup, the bidirectional LSTM achieved \TBD{accuracy, XX.X\%}, the wavelet random forest achieved \TBD{XX.X\%}, the raw-EMG CNN achieved \TBD{XX.X\%}, and the wavelet MLP achieved \TBD{XX.X\%}. These comparisons describe the observed five-participant dataset and should not be interpreted as population-level superiority tests.
+
+The EMG-only configuration achieved \TBD{accuracy, XX.X\%}, and the audio-only configuration achieved \TBD{accuracy, XX.X\%} (Table~\ref{tab:modality_ablation}). Fusion achieved \TBD{accuracy, XX.X\%}, an observed change of \TBD{XX.X percentage points} relative to EMG alone. For the newly added rest class, the fused model achieved \TBD{rest precision, XX.X\%}, \TBD{rest recall, XX.X\%}, \TBD{rest F1, XX.X\%}, and \TBD{rest one-vs-rest AUC, 0.XXX}.
+
+\begin{table*}[t]
+  \centering
+  \caption{Performance of the evaluated five-class models on pooled held-out LOSO predictions. The classes are rest, movement, clenching, grinding, and chewing. Values are descriptive for this five-participant dataset.}
+\color{black}
+  \label{tab:results}
+\color{blue}
+  \begin{tabular}{lccccc}
+    \toprule
+    Method & Accuracy & Macro precision & Macro recall & Macro F1 & Macro AUC \\
+    \midrule
+    \textbf{Wavelet dual-branch CNN} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Bidirectional LSTM & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Wavelet + random forest & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Raw EMG + CNN & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Wavelet + MLP & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    \bottomrule
+  \end{tabular}
+
+\color{blue}
+  \vspace{2em}
+\color{black}
+
+\color{blue}
+  \caption{Five-class modality ablation on pooled held-out LOSO predictions. Accuracy differences are relative to the reference configuration stated in the final column.}
+\color{black}
+  \label{tab:modality_ablation}
+\color{blue}
+  \begin{tabular}{lcccccc}
+    \toprule
+    Configuration & Accuracy & Macro precision & Macro recall & Macro F1 & Macro AUC & Accuracy difference \\
+    \midrule
+    Audio only & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & -- \\
+    EMG only & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & \TBD{vs.\ audio} \\
+    \textbf{EMG + audio} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & \TBD{vs.\ EMG} \\
+    \bottomrule
+  \end{tabular}
+
+\color{blue}
+  \vspace{2em}
+\color{black}
+
+\color{blue}
+  \caption{Per-class performance of the five-class fused model. AUC is one-vs-rest and must be calculated from held-out probabilities.}
+\color{black}
+  \label{tab:perclass}
+\color{blue}
+  \begin{tabular}{lccccc}
+    \toprule
+    Class & Precision & Recall & F1 & AUC & Windows \\
+    \midrule
+    Rest & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & \TBD{X,XXX} \\
+    Movement & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & 1,877 \\
+    Clenching & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & 2,503 \\
+    Grinding & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & 1,861 \\
+    Chewing & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & 5,604 \\
+    \midrule
+    \textbf{Macro average} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} & \TBD{XX,XXX} \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\color{blue}
+\subsection{Secondary analyses with rest}
+
+When chewing was excluded, the remaining four-class problem comprised rest, movement, clenching, and grinding. This analysis yielded \TBD{accuracy, XX.X\%}, \TBD{macro precision, XX.X\%}, \TBD{macro recall, XX.X\%}, \TBD{macro F1, XX.X\%}, and \TBD{macro AUC, 0.XXX} (Table~\ref{tab:sensitivity}). Reporting this analysis prevents the comparatively recognizable chewing class from dominating interpretation of the global metrics.
+
+For a task-level binary analysis, clenching and grinding were treated as the positive group and rest, movement, and chewing as the comparison group. This yielded \TBD{accuracy, XX.X\%}, \TBD{precision, XX.X\%}, \TBD{recall/sensitivity, XX.X\%}, \TBD{specificity, XX.X\%}, \TBD{F1, XX.X\%}, and \TBD{ROC--AUC, 0.XXX}. The false-positive rate during quiet-rest windows was \TBD{XX.X\%}, and \TBD{XX of X,XXX} rest windows were classified as clenching or grinding. This analysis includes a laboratory non-event class but still does not measure spontaneous bruxism detection in a continuous free-living stream.
+
+\begin{table*}[h]
+  \caption{Secondary analyses computed from pooled five-class held-out predictions.}
+  \label{tab:sensitivity}
+  \centering
+  \begin{tabular}{lcccccc}
+    \toprule
+    Analysis & Accuracy & Precision & Recall & Specificity & F1 & AUC \\
+    \midrule
+    Excluding chewing$^{a}$ & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & -- & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Collapsed binary$^{b}$ & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    \bottomrule
+  \end{tabular}
+  \begin{flushleft}\footnotesize
+  $^{a}$Macro precision, recall, F1, and one-vs-rest AUC across rest, movement, clenching, and grinding.\\
+  $^{b}$Instructed clenching/grinding treated as positive; rest/movement/chewing treated as the comparison group. This is task discrimination, not clinical diagnosis.
+  \end{flushleft}
+\end{table*}
+\color{black}
+
+\subsection{Class-level diagnostics}
+
+\color{blue}
+The highest per-class F1 was observed for \TBD{class name, XX.X\%}, and the lowest was observed for \TBD{class name, XX.X\%}. Rest was most frequently confused with \TBD{class}, whereas clenching was most frequently confused with \TBD{class}. Confusion between quiet rest and the instructed clenching/grinding group occurred in \TBD{XX.X\%} of rest windows. These errors are particularly important because they approximate false alarms under the limited quiet-rest condition.
+\color{black}
+
+\color{blue}
+We used t-distributed stochastic neighbor embedding (t-SNE)~\cite{vandermaaten2008visualizing} to visualize the 72-dimensional fusion features (Fig.~\ref{fig:tsne}). \TBD{Describe the five-class embedding only after generating the new plot.} Because t-SNE is an exploratory nonlinear visualization, apparent clusters are not evidence of clinical phenotypes.
+\color{black}
+
+\begin{figure*}[h]
+  \centering
+\color{blue}
+  \IfFileExists{Figures/tsne_5class.png}
+    {\includegraphics[width=0.8\linewidth]{Figures/tsne_5class.png}}
+    {\fbox{\parbox[c][5cm][c]{0.78\textwidth}{\centering\TBD{Replace with five-class t-SNE figure: Figures/tsne\_5class.png}}}}
+  \caption{t-SNE visualization of the learned feature space for rest, movement, clenching, grinding, and chewing. \TBD{Add a data-grounded description after generating the figure.} This exploratory visualization does not establish clinical phenotypes.}
+  \Description{A placeholder for a two-dimensional scatter plot of the five experimental classes.}
+\color{black}
+  \label{fig:tsne}
+\end{figure*}
+
+\color{blue}
+The pooled five-class confusion matrix is shown in Fig.~\ref{fig:confusion}. The diagonal counts were \TBD{rest, X,XXX}, \TBD{movement, X,XXX}, \TBD{clenching, X,XXX}, \TBD{grinding, X,XXX}, and \TBD{chewing, X,XXX}. The corresponding class supports are listed in Table~\ref{tab:perclass}.
+\color{black}
+
+\begin{figure*}[h]
+  \centering
+\color{blue}
+  \IfFileExists{Figures/confmatrx_5class.png}
+    {\includegraphics[width=0.85\linewidth]{Figures/confmatrx_5class.png}}
+    {\fbox{\parbox[c][6cm][c]{0.82\textwidth}{\centering\TBD{Replace with normalized and count-based five-class confusion matrix: Figures/confmatrx\_5class.png}}}}
+  \caption{Pooled LOSO confusion matrix for rest, movement, clenching, grinding, and chewing. \TBD{Describe the dominant errors after generating the matrix.}}
+  \Description{A placeholder for a five-by-five confusion matrix.}
+\color{black}
+  \label{fig:confusion}
+\end{figure*}
+
+\color{blue}
+\subsection{Participant-level results}
+\color{black}
+
+\color{blue}
+Table~\ref{tab:persubject} reports five-class point estimates for each held-out participant. Across participants, accuracy ranged from \TBD{XX.X\%} to \TBD{XX.X\%}, macro F1 ranged from \TBD{XX.X\%} to \TBD{XX.X\%}, and macro AUC ranged from \TBD{0.XXX} to \TBD{0.XXX}. These five values describe internal LOSO behavior only. They do not estimate performance across age groups, anatomical variation, dentition, bruxism phenotypes, or clinical settings.
+\color{black}
+
+\color{blue}
+\begin{table}[h]
+  \caption{Five-class performance for each held-out participant.}
+  \label{tab:persubject}
+\color{black}
+  \centering
+\color{blue}
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lccc@{}}
+    \toprule
+    Held-out participant & Accuracy & Macro F1 & Macro AUC \\
+    \midrule
+    Participant 1 & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Participant 2 & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Participant 3 & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Participant 4 & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    Participant 5 & \TBD{XX.X\%} & \TBD{XX.X\%} & \TBD{0.XXX} \\
+    \midrule
+    Mean $\pm$ SD & \TBD{XX.X $\pm$ X.X\%} & \TBD{XX.X $\pm$ X.X\%} & \TBD{0.XXX $\pm$ 0.XXX} \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+\color{black}
+
+\color{blue}
+\subsection{Training behavior and computational measurements}
+\color{black}
+
+\color{blue}
+The five-class model converged after approximately \TBD{XX epochs}, and early stopping was triggered at epoch \TBD{XX} (Fig.~\ref{fig:loss_curves}). The final training--validation accuracy gap was \TBD{X.X percentage points}.
+\color{black}
+
+\color{blue}
+\begin{figure*}[h]
+  \centering
+  \IfFileExists{Figures/wavelet_training_results_5class_1.png}
+    {\includegraphics[width=0.7\linewidth]{Figures/wavelet_training_results_5class_1.png}}
+    {\fbox{\parbox[c][3.5cm][c]{0.68\textwidth}{\centering\TBD{Replace with five-class loss curves}}}}
+
+  \IfFileExists{Figures/wavelet_training_results_5class_2.png}
+    {\includegraphics[width=0.7\linewidth]{Figures/wavelet_training_results_5class_2.png}}
+    {\fbox{\parbox[c][3.5cm][c]{0.68\textwidth}{\centering\TBD{Replace with five-class accuracy curves}}}}
+\color{black}
+
+\color{blue}
+  \caption{Training and validation loss (top) and accuracy (bottom) for the five-class model.}
+  \label{fig:loss_curves}
+\end{figure*}
+\color{black}
+
+\color{blue}
+The five-class model contained \TBD{exact trainable parameter count} parameters. On an Intel i7-12750H CPU, inference for one pre-segmented 1-second window averaged \TBD{XX.X ms}; on an NVIDIA RTX 4090 GPU, it averaged \TBD{X.X ms}. Wavelet decomposition accounted for approximately \TBD{XX\%} of measured inference time, and the inference memory footprint was approximately \TBD{X.X MB}. These bench measurements show computational demand on the tested computers. They do not establish power consumption, end-to-end latency, wireless synchronization, or reliability on a wearable device.
+\color{black}
+
+\section{Discussion}
+
+\color{blue}
+\subsection{Engineering interpretation}
+\color{black}
+
+\color{blue}
+Within this dataset, the dual-branch wavelet CNN achieved \TBD{state its numerical advantage or remove the word 'outperformed' if it is not supported after retraining}. Adding quiet rest changed the task from classification among activity windows to discrimination of five experimental conditions, including a limited non-event condition. Audio contributed \TBD{describe only the observed modality-specific benefit after rerunning the ablation}. Figure~\ref{fig:signal_comparison} illustrates the qualitative contrast between instructed grinding and chewing: the instructed grinding trial shows sustained activation and contact sound, whereas chewing shows rhythmic EMG bursts and food-dependent acoustic structure. This supports the engineering rationale for modality-specific processing but does not establish that the same signatures will persist during spontaneous behavior.
+\color{black}
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=0.8\linewidth]{grinding all emg channels.png}
+
+\color{blue}
+  \small (a) Instructed grinding EMG
+\color{black}
+
+  \includegraphics[width=0.8\linewidth]{Gum all emg channels.png}
+
+\color{blue}
+  \small (b) Chewing-gum EMG
+\color{black}
+
+  \vspace{1em}
+\color{blue}
+  \caption{Examples of EMG recorded during instructed tasks. (a) The instructed grinding trial shows sustained high-amplitude activation. (b) Chewing gum shows rhythmic bursts with relaxation intervals. Representative examples are illustrative and are not validation against natural bruxism episodes.}
+\color{black}
+  \label{fig:signal_comparison}
+\end{figure*}
+
+\color{blue}
+The current result should be compared cautiously with the greater-than-90\% accuracy reported by Sonmezocak and Kurt using EMG alone~\cite{sonmezocak2021detection}. Their classes included jaw opening, clenching, rhythmic grinding, and fatigue/pain; the present classes include rest, movement, clenching, grinding, and chewing. Dataset composition, preprocessing, sample size, and validation design also differ. Our five-class EMG-only model achieved \TBD{XX.X\%} under LOSO, while multimodal fusion achieved \TBD{XX.X\%}. These studies therefore answer different classification questions, and the numerical accuracies do not show that either method is clinically superior.
+\color{black}
+
+\color{blue}
+The clenching--grinding distinction was retained to test whether the architecture could separate static and lateral tooth-contact tasks. We do not claim that this distinction is always necessary for clinical management. Both are only parts of the wider bruxism construct, and short windows may be difficult to label when a grinding movement includes a static clenching phase. The observed confusion may therefore reflect both signal overlap and task-label ambiguity.
+\color{black}
+
+\color{blue}
+\subsection{Effect of the chewing class}
+\color{black}
+
+\color{blue}
+Chewing was selected as a relevant functional confound, not as evidence of bruxism. In the five-class model, it comprised \TBD{XX.X\%} of the windows and achieved an F1 score of \TBD{XX.X\%}. Excluding chewing changed accuracy from \TBD{XX.X\%} to \TBD{XX.X\%} and macro F1 from \TBD{XX.X\%} to \TBD{XX.X\%}. Reporting both analyses provides a more balanced account of model performance.
+\color{black}
+
+\color{blue}
+The post-hoc two-group analysis now includes quiet rest in the comparison group, making it more relevant than the original activity-only analysis. However, it must still not be labeled clinical ``bruxism detection.'' Chewing can include tooth contact, clenching may occur without clinically important bruxism, and natural bruxism also includes bracing or thrusting without tooth contact. Quiet laboratory rest is much narrower than unrestricted everyday background behavior. A deployable detector will require continuous-stream onset and offset evaluation, diverse non-event behaviors, false alarms per unit time, and event-level sensitivity and positive predictive value.
+\color{black}
+
+\color{blue}
+\subsection{Clinical interpretation within current bruxism and TMD frameworks}
+\color{black}
+
+\color{blue}
+The present sensors measure muscle and sound patterns, not the biological, psychological, or social meaning of those patterns. Under the biopsychosocial model, the same motor activity may have different context, drivers, and consequences across people and time~\cite{manfredini2026biopsychosocial}. A future device should therefore be positioned as one source of instrumentally based assessment within STAB, combined when appropriate with subject report, clinical examination, psychosocial information, sleep-related factors, medications and substances, and possible consequences~\cite{manfredini2024standardised}.
+\color{black}
+
+\color{blue}
+The manuscript also deliberately avoids claiming that bruxism caused TMD or that classifying a task can diagnose or guide treatment of TMD. INfORM/IADR emphasizes validated history and examination, patient-centered decision-making, and conservative management, and cautions that unsupported technological measurements should not replace standard assessment~\cite{inform2025tmd}. Any future clinical study of this system should predefine its intended use---for example, behavior quantification, biofeedback support, or screening for further assessment---and validate that use against an appropriate reference standard.
+\color{black}
+
+\color{blue}
+The need for precise claims is not semantic alone. Practice surveys show inconsistent assessment and management approaches~\cite{mungia2025approaches}, and studies of students and educational programs identify persistent gaps in bruxism and TMD knowledge~\cite{nasanen2026competence,sangalli2026education}. Labeling an instructed-task classifier as a diagnostic bruxism device could reinforce precisely the conflation that current terminology and education seek to correct.
+\color{black}
+
+\color{blue}
+\subsection{Natural fluctuation and future home measurement}
+\color{black}
+
+\color{blue}
+Laboratory repetitions do not capture the frequency, duration, context, or natural variability of awake behavior. EMA studies demonstrate the value of repeated real-time reports in the natural environment~\cite{bracci2018frequency}; longer observations also show that behavior estimates must be interpreted across days and months rather than from a single session~\cite{colonna2025fluctuation}. Bracci et al.~\cite{bracci2024metrics} recommend selecting subject-based, clinically based, or instrumentally based metrics according to the research question. Colonna et al.~\cite{colonna2023electromyographic} further illustrate the feasibility and challenges of 24-hour home EMG.
+\color{black}
+
+\color{blue}
+A next-stage awake study should combine multi-day audio--EMG with synchronized EMA, a clearly defined background/rest class, and blinded annotation of candidate episodes. Day-level and participant-level performance should be reported, including false positives per hour. Privacy-preserving audio features or on-device feature extraction should be considered before home deployment.
+\color{black}
+
+\color{blue}
+No conclusion about sleep bruxism can be drawn from the present awake laboratory tasks. A sleep study would require overnight data, appropriate sleep staging and event criteria, comparison with a suitable reference such as polysomnography or validated portable assessment, and repeated nights to evaluate night-to-night variability~\cite{cidverdejo2024instrumental}. Separate models may be required for awake and sleep contexts.
+\color{black}
+
+\color{blue}
+\subsection{Validity and limitations}
+\color{black}
+
+\color{blue}
+The principal limitation is the cohort size ($N=5$). The \TBD{XX,XXX} overlapping five-class windows provide many optimization examples but do not replace independent participants. Window-level confidence intervals or tests would overstate precision, and LOSO does not establish external generalization when only five people are available. Age, facial anatomy, subcutaneous tissue, dentition, electrode placement, skin impedance, behavior intensity, and prior diagnosis may all affect EMG and audio signals.
+\color{black}
+
+\color{blue}
+Construct validity is limited because the task set covers tooth-contact clenching and grinding but not bracing or thrusting without tooth contact. The participants' prior diagnoses were not independently phenotyped for this study. Criterion validity is not established because no spontaneous episode was verified against a clinical or instrumental reference standard. Ecological validity is limited because participants intentionally performed the tasks in a controlled laboratory. Elicited activities may be more regular, longer, or more forceful than natural activity, making them easier to classify. Device validity is consequently limited to internal discrimination of these instructed task windows.
+\color{black}
+
+\color{blue}
+Including quiet rest corrects one limitation of the original four-class analysis, but the background data remain incomplete. Rest was recorded in a controlled laboratory and did not systematically sample speaking, swallowing, facial expression, head movement, coughing, eating outside the scripted task, environmental noise, or other free-living behaviors. The five-class analysis can estimate confusion against quiet rest, but it still cannot estimate false alarms per hour during unrestricted use. The current microphone setup also raises privacy and ambient-noise issues that were not tested.
+\color{black}
+
+\color{blue}
+Finally, the modality comparison is algorithm-specific. A stronger EMG-only architecture, different sensor placement, additional muscles, or calibrated intensity features could alter the observed fusion benefit. The reported computational measurements were obtained on laptop/desktop hardware rather than a wearable prototype.
+\color{black}
+
+\color{blue}
+\section{Conclusion}
+\color{black}
+
+\color{blue}
+This five-participant proof-of-concept study evaluates whether a compact dual-branch wavelet CNN can combine surface EMG and audio to classify quiet rest and four instructed awake jaw activities. The fused model achieved \TBD{five-class accuracy, XX.X\%}, \TBD{macro-F1, XX.X\%}, and \TBD{macro AUC, 0.XXX}. Excluding chewing yielded \TBD{accuracy, XX.X\%} and \TBD{macro-F1, XX.X\%} across rest, movement, clenching, and grinding. The collapsed clenching/grinding-versus-rest/movement/chewing analysis achieved \TBD{F1, XX.X\%} and \TBD{AUC, 0.XXX}.
+\color{black}
+
+\color{blue}
+The study does not validate a bruxism diagnostic device. Although quiet-rest windows are now included, the study did not include bracing or thrusting, unrestricted background behavior, spontaneous awake episodes, sleep recordings, or an independent clinical reference standard. The defensible conclusion is therefore technical: modality-specific audio--EMG fusion merits further evaluation for distinguishing instructed jaw activities from quiet rest in a larger, phenotyped, multi-day continuous-recording study designed around current bruxism terminology and clinical assessment frameworks.
+\color{black}
+
+\color{blue}
+\backmatter
+\color{black}
+
+\color{blue}
+\section*{Data availability}
+The datasets generated and/or analyzed during the current study are not publicly available because of participant-privacy restrictions but are available from the corresponding author on reasonable request, subject to institutional and ethical requirements.
+\color{black}
+
+\color{blue}
+\section*{Code availability}
+The custom code used for signal preprocessing, wavelet decomposition, model training, and evaluation is available from the corresponding author on reasonable request.
+\color{black}
+
+\color{blue}
+\section*{Funding declaration}
+Research reported in this publication was supported by an award from the Rhode Island Life Science Hub Small Grant Program (Principal Investigator T. A. Walls; Co-Investigators R. Abiri and M. Furmanek). The project was also partially supported by National Science Foundation grant 2245558 (Principal Investigator R. Abiri).
+
+\section*{Acknowledgements}
+We thank University of Rhode Island undergraduate and graduate students Anjolaoluwa Akingbile, Jessica Constantine, and Nathan DeSalvo, who located and summarized the functions of bruxism devices before this project.
+\color{black}
+
+\color{blue}
+\section*{Author contributions}
+M.H.F.: methodology, software, analysis, writing---original draft, and writing---review and editing. A.R.: protocol development, software, data curation, data collection, formal analysis, and review and editing. R.S.: methodology, validation, and writing---review and editing. M.P.F.: conceptualization and study design, research-grant development, protocol development, and manuscript revision. R.A.: conceptualization, project administration, resources, supervision, and writing---review and editing. T.A.W.: conceptualization, research-grant authorship, protocol development, project oversight, and manuscript revision. All authors reviewed and approved the final manuscript.
+\color{black}
+
+\color{blue}
+\section*{Competing interests}
+The authors declare no competing interests.
+\color{black}
+
+\color{blue}
+\begin{thebibliography}{99}
+\color{black}
+
+\color{blue}
+\bibitem{lobbezoo2018international}
+Lobbezoo, F. \emph{et al.} International consensus on the assessment of bruxism: report of a work in progress. \emph{J. Oral Rehabil.} \textbf{45}, 837--844 (2018).
+\color{black}
+
+\color{blue}
+\bibitem{manfredini2024standardised}
+Manfredini, D. \emph{et al.} Standardised Tool for the Assessment of Bruxism. \emph{J. Oral Rehabil.} \textbf{51}, 29--58 (2024).
+\color{black}
+
+\color{blue}
+\bibitem{colonna2023electromyographic}
+Colonna, A., Noveri, L., Ferrari, M., Bracci, A. \& Manfredini, D. Electromyographic assessment of masseter muscle activity: a proposal for a 24 h recording device with preliminary data. \emph{J. Clin. Med.} \textbf{12}, 247 (2023).
+\color{black}
+
+\color{blue}
+\bibitem{gul2024advanced}
+Gul, J. Z., Yang, B.-S., Kuo, Y.-C., Hsu, W.-H. \& Su, F.-C. Advanced sensing system for sleep bruxism across multiple postures via EMG and machine learning. \emph{Sensors} \textbf{24}, 5426 (2024).
+\color{black}
+
+\color{blue}
+\bibitem{stuginski2016detection}
+Stuginski-Barbosa, J., Porporatti, A. L., Costa, Y. M., Svensson, P. \& Conti, P. C. R. Agreement of the International Classification of Sleep Disorders criteria with polysomnography for sleep bruxism diagnosis. \emph{J. Prosthet. Dent.} \textbf{117}, 61--66 (2017).
+\color{black}
+
+\color{blue}
+\bibitem{raez2006techniques}
+Raez, M. B. I., Hussain, M. S. \& Mohd-Yasin, F. Techniques of EMG signal analysis: detection, processing, classification and applications. \emph{Biol. Proced. Online} \textbf{8}, 11--35 (2006).
+\color{black}
+
+\color{blue}
+\bibitem{castroflorio2013use}
+Castroflorio, T., Mesin, L., Tartaglia, G. M., Sforza, C. \& Farina, D. Use of electromyographic and electrocardiographic signals to detect sleep bruxism episodes in a natural environment. \emph{IEEE J. Biomed. Health Inform.} \textbf{17}, 994--1001 (2013).
+\color{black}
+
+\color{blue}
+\bibitem{sonmezocak2021detection}
+Sonmezocak, T. \& Kurt, S. Detection of EMG signals by neural networks using autoregression and wavelet entropy for bruxism diagnosis. \emph{Elektron. Elektrotechn.} \textbf{27}, 11--21 (2021).
+\color{black}
+
+\color{blue}
+\bibitem{heyat2020computational}
+Heyat, M. B. B. \emph{et al.} Computational ensemble expert system classification for the recognition of bruxism using physiological signals. \emph{Appl. Sci.} \textbf{10}, 7410 (2020).
+\color{black}
+
+\color{blue}
+\bibitem{lan2022comparative}
+Lan, K.-W., Jiang, L.-L. \& Yan, Y. Comparative study of surface electromyography of masticatory muscles in patients with different types of bruxism. \emph{World J. Clin. Cases} \textbf{10}, 6876--6889 (2022).
+\color{black}
+
+\color{blue}
+\bibitem{romano2024wearable}
+Romano, F. \emph{et al.} Toward wearables for bruxism detection: voluntary oral behaviors sound recorded across the head depend on transducer placement. \emph{Clin. Exp. Dent. Res.} \textbf{10}, e70001 (2024).
+\color{black}
+
+\color{blue}
+\bibitem{martinot2021artificial}
+Martinot, J.-B. \emph{et al.} Artificial intelligence analysis of mandibular movements enables accurate detection of phasic sleep bruxism in OSA patients: a pilot study. \emph{Nat. Sci. Sleep} \textbf{13}, 1449--1459 (2021).
+\color{black}
+
+\color{blue}
+\bibitem{haugland2020automatic}
+Haugland, M., Christiansen, C. \& Takano, N. Automatic detection of teeth clenching and/or teeth grinding. US Patent 10,736,560 (2020).
+\color{black}
+
+\color{blue}
+\bibitem{patwa2017bruxism}
+Patwa, A. N. \& Patwa, M. N. Bruxism detection system with chin-mounted accelerometer sensor. US Patent Application 2017/0265801 (2017).
+\color{black}
+
+\color{blue}
+\bibitem{englehart2003robust}
+Englehart, K. \& Hudgins, B. A robust, real-time control scheme for multifunction myoelectric control. \emph{IEEE Trans. Biomed. Eng.} \textbf{50}, 848--854 (2003).
+\color{black}
+
+\color{blue}
+\bibitem{phinyomark2012feature}
+Phinyomark, A., Phukpattaranont, P. \& Limsakul, C. Feature reduction and selection for EMG signal classification. \emph{Expert Syst. Appl.} \textbf{39}, 7420--7431 (2012).
+\color{black}
+
+\color{blue}
+\bibitem{chowdhury2013surface}
+Chowdhury, R. H. \emph{et al.} Surface electromyography signal processing and classification techniques. \emph{Sensors} \textbf{13}, 12431--12466 (2013).
+\color{black}
+
+\color{blue}
+\bibitem{faust2018deep}
+Faust, O., Hagiwara, Y., Hong, T. J., Lih, O. S. \& Acharya, U. R. Deep learning for healthcare applications based on physiological signals: a review. \emph{Comput. Methods Programs Biomed.} \textbf{161}, 1--13 (2018).
+\color{black}
+
+\color{blue}
+\bibitem{tsinganos2019improved}
+Tsinganos, P., Cornelis, B., Cornelis, J., Jansen, B. \& Weiss, A. Improved gesture recognition based on sEMG signals and temporal convolutional networks. \emph{IEEE Access} \textbf{7}, 154853--154863 (2019).
+\color{black}
+
+\color{blue}
+\bibitem{lin2017focal}
+Lin, T.-Y., Goyal, P., Girshick, R., He, K. \& Doll\'ar, P. Focal loss for dense object detection. In \emph{Proc. IEEE Int. Conf. Computer Vision}, 2980--2988 (2017).
+\color{black}
+
+\color{blue}
+\bibitem{johnson2019survey}
+Johnson, J. M. \& Khoshgoftaar, T. M. Survey on deep learning with class imbalance. \emph{J. Big Data} \textbf{6}, 27 (2019).
+\color{black}
+
+\color{blue}
+\bibitem{vandermaaten2008visualizing}
+van der Maaten, L. \& Hinton, G. Visualizing data using t-SNE. \emph{J. Mach. Learn. Res.} \textbf{9}, 2579--2605 (2008).
+\color{black}
+
+\color{blue}
+\bibitem{bharathi2025unveiling}
+Bharathi, B. M. R., Balaji, N. S., Meena, R. \& Sekar, M. R. C. Unveiling optimal mother wavelets by COPRAS method: analyzing speech signals despite face mask and shield obstacles. \emph{Sci. Rep.} \textbf{15}, 14044 (2025).
+\color{black}
+
+\color{blue}
+\bibitem{verhoeff2025definitions}
+Verhoeff, M. C. \emph{et al.} Updating the bruxism definitions: report of an international consensus meeting. \emph{J. Oral Rehabil.} \textbf{52}, 1335--1342 (2025). doi:10.1111/joor.13985.
+\color{black}
+
+\color{blue}
+\bibitem{manfredini2026biopsychosocial}
+Manfredini, D. \& Lobbezoo, F. The biopsychosocial model of bruxism. \emph{Cranio}, 1--9 (2026). doi:10.1080/08869634.2026.2655187.
+
+\bibitem{manfredini2024evolution}
+Manfredini, D. The evolution of a field: a challenge and an opportunity. \emph{Cranio} \textbf{42}, 251--252 (2024). doi:10.1080/08869634.2024.2320624.
+
+\bibitem{inform2025tmd}
+Manfredini, D. \emph{et al.} Temporomandibular disorders: INfORM/IADR key points for good clinical practice based on standard of care. \emph{Cranio} \textbf{43}, 1--5 (2025). doi:10.1080/08869634.2024.2405298.
+
+\bibitem{mungia2025approaches}
+Mungia, R. \emph{et al.} Dental practitioner approaches to bruxism: preliminary findings from the National Dental Practice-Based Research Network. \emph{Cranio} \textbf{43}, 480--488 (2025). doi:10.1080/08869634.2023.2192173.
+
+\bibitem{nasanen2026competence}
+N\"as\"anen, J. \emph{et al.} Self-assessed competence in relation to bruxism among undergraduate dental students in Finland. \emph{Cranio} \textbf{44}, 160--170 (2026; published online 2025). doi:10.1080/08869634.2025.2472085.
+
+\bibitem{sangalli2026education}
+Sangalli, L. Evolving progress in temporomandibular disorder education for predoctoral dental programs. \emph{Cranio} \textbf{44}, 181--183 (2026; published online 2025). doi:10.1080/08869634.2025.2543482.
+
+\bibitem{bracci2024metrics}
+Bracci, A. \emph{et al.} Research routes on awake bruxism metrics: implications of the updated bruxism definition and evaluation strategies. \emph{J. Oral Rehabil.} \textbf{51}, 150--161 (2024). doi:10.1111/joor.13514.
+
+\bibitem{bracci2018frequency}
+Bracci, A., Djukic, G., Favero, L., Salmaso, L., Guarda-Nardini, L. \& Manfredini, D. Frequency of awake bruxism behaviors in the natural environment: a seven-day, multiple-point observation of real-time report in healthy young adults. \emph{J. Oral Rehabil.} \textbf{45}, 423--429 (2018). doi:10.1111/joor.12627.
+
+\bibitem{colonna2025fluctuation}
+Colonna, A., Lobbezoo, F., Bracci, A., Ferrari, M., Val, M. \& Manfredini, D. Long-term study on the fluctuation of self-reported awake bruxism in a cohort of healthy young adults. \emph{J. Oral Rehabil.} \textbf{52}, 37--42 (2025). doi:10.1111/joor.13872.
+
+\bibitem{cidverdejo2024instrumental}
+Cid-Verdejo, R. \emph{et al.} Instrumental assessment of sleep bruxism: a systematic review and meta-analysis. \emph{Sleep Med. Rev.} \textbf{74}, 101906 (2024). doi:10.1016/j.smrv.2024.101906.
+\color{black}
+
+\color{blue}
+\end{thebibliography}
+\color{black}
+
+\color{black}
+\end{document}

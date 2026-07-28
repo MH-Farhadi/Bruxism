@@ -1,0 +1,75 @@
+# Secondary endpoints: binary tooth-contact, ternary, and the provenance-only legacy task.
+#
+#   bruxism-ablations --config configs/experiments/secondary_tasks.yaml
+#
+# Each is a purpose-trained model under the same outer protocol -- NOT a relabelling of the
+# five-class confusion matrix. legacy_active_four_class is provenance only and omits rest.
+name: secondary_tasks
+description: Binary / ternary / legacy-four-class endpoints, each purpose-trained.
+task_id: binary_tooth_contact
+model_id: dual_branch_wavelet_cnn
+modality: fusion
+sweep_task_ids: [binary_tooth_contact, ternary, legacy_active_four_class]
+
+data:
+  data_root: ../Data
+  sampling_rate_hz: 1200
+  segmentation_policy: trigger_constrained
+  window_seconds: 1.0
+  stride_seconds: 0.5
+  guard_seconds: 0.25
+  startup_guard_seconds: 0.5
+  shutdown_guard_seconds: 0.0
+  allow_trigger_off_as_rest: false
+  emg_channels: null
+  cache_dir: outputs/cache
+
+filters:
+  # 60 Hz notch then a 20-450 Hz bandpass. The prototype's extra 5 Hz high-pass is a no-op
+  # after a 20 Hz bandpass edge and was removed rather than carried forward.
+  zero_phase: true          # filtfilt: ACAUSAL / OFFLINE. Not a real-time chain.
+  emg_stages:
+    - {kind: notch, freq_hz: 60.0, quality: 30.0,
+       rationale: "Suppress North American mains interference at 60 Hz."}
+    - {kind: bandpass, low_hz: 20.0, high_hz: 450.0, order: 4,
+       rationale: "Standard surface-EMG band, below the 600 Hz Nyquist frequency."}
+  mic_stages:
+    - {kind: highpass, freq_hz: 20.0, order: 2,
+       rationale: "Remove the large DC offset; no further shaping, the transducer response is undocumented."}
+
+normalization:
+  scope: per_channel
+  method: zscore
+
+augmentation:
+  enabled: true
+  probability: 0.4
+  minority_only: true
+  minority_threshold: 0.7
+  amplitude_scale_range: [0.9, 1.1]
+  noise_std_fraction: 0.02
+  max_shift_samples: 50
+
+selection:
+  objective: macro_f1        # prespecified; imbalance makes accuracy misleading
+  epoch_budget_rule: median
+  min_epochs: 5
+  max_epochs: 60
+  patience: 15
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: adamw
+  loss: focal
+  focal_gamma: 1.5
+  class_weight_scheme: balanced
+  num_workers: 0
+  device: auto
+  deterministic: true
+  seeds: [0, 1, 2]
+  search_space: {}
+
+output:
+  runs_root: outputs/runs
+  save_checkpoints: true

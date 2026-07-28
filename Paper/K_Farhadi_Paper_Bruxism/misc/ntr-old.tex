@@ -1,0 +1,465 @@
+\documentclass[pdflatex,sn-vancouver-num, iicol]{sn-jnl}
+
+%%%% STANDARD PACKAGES (KEEP THESE) %%%%
+\usepackage{graphicx}% Required for inserting images
+\usepackage{multirow}% Required for tables
+\usepackage{amsmath,amssymb}% Required for math symbols
+\usepackage{booktabs}% Required for better table formatting
+\usepackage{mathrsfs}% Often required by sn-jnl for fonts
+\usepackage[title]{appendix}% Required for appendices
+\usepackage{xcolor}% Required for text colors
+\usepackage{textcomp}% Required for special symbols
+\usepackage{manyfoot}% Required for footnotes
+\usepackage{wrapfig}
+\usepackage{indentfirst}
+
+\usepackage[normalem]{ulem}
+\newcommand{\singh}[1]{\textcolor{red}{#1}}
+
+\graphicspath{{./}{figures/}{Figures/}}
+
+\providecommand{\Description}[1]{}
+
+\begin{document}
+
+\title[Sensor-based Bruxism Detection with Dual-Branch Wavelet CNNs]{Sensor-based Bruxism Detection with Dual-Branch Wavelet CNNs and Audio-EMG Data Fusion}
+
+\author[1]{\fnm{MH} \sur{Farhadi}}
+\author[1]{\fnm{Ali} \sur{Rabiee}}
+\author[1]{\fnm{Rahul} \sur{Singh}}
+\author[2,3]{\fnm{Mariusz P.} \sur{Furmanek}}
+\author*[1]{\fnm{Reza} \sur{Abiri}}\email{reza\_abiri@uri.edu}
+\author*[4]{\fnm{Theodore A.} \sur{Walls}}\email{walls@uri.edu}
+
+\affil[1]{\orgdiv{Department of Electrical, Computer, and  Biomedical Engineering}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\affil[2]{\orgdiv{Department of Physical Therapy}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\affil[3]{\orgdiv{Institute of Sport Sciences, Academy of Physical Education in Katowice}, \orgaddress{\city{Katowice}, \state{} \country{Poland}}}
+\affil[4]{\orgdiv{Department of Psychology}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\abstract{Bruxism, the involuntary grinding or clenching of teeth, affects approximately 20\% of adults and causes substantial dental and musculoskeletal damage. Despite severe long-term financial and quality-of-life impacts, bruxism frequently remains undiagnosed until irreversible damage occurs. Methods for continuous real-time monitoring and intervention are lacking. Detecting awake bruxism presents particular challenges, as pathological grinding must be distinguished from routine mastication. We present a novel approach validating real-time detection using affordable electromyography (EMG) and microphone sensors. Our approach employs a dual-branch Convolutional Neural Network (CNN) that fuses modality specific wavelet features from EMG and audio signals. The model achieves 81.8\% accuracy and an 80.0\% F1-score across 5 participants when classifying four distinct oral activities (movement, clenching, grinding, and chewing.) Audio fusion significantly improves accuracy by 14.2 percentage points ($p<0.001$) by successfully differentiating chewing from grinding. This work demonstrates the clinical utility of low-cost instrumentation, advancing accessible screening solutions for early diagnosis. It also provides a platform for monitoring disease progression, including outcomes of digital or biofeedback treatment.}
+
+\keywords{Bruxism Detection, Passive Monitoring, Audio Signal Processing, Convolutional Neural Networks, Wavelet Decomposition, Digital Health}
+
+
+\maketitle
+
+
+\vspace{1em}
+\noindent Manuscript Details \\
+Total Manuscript Word Count: 5800 \\
+Abstract Word Count: 166 \\
+Total Number of Figures: 7 \\
+Total Number of Tables: 5 
+
+\vspace{1em}
+\noindent Corresponding Authors Contact Information \\
+Reza Abiri -- Phone: 401-874-4102 , Fax: [N/A] \\
+Theodore A Walls -- Phone: [401-874-2105], Fax: [N/A]
+\vspace{2em}
+
+
+
+
+
+\newpage
+\section{Introduction}
+
+Bruxism is characterized by the involuntary grinding or clenching of teeth, occurring during both sleep and wakefulness. While sleep bruxism requires overnight polysomnographic monitoring, awake bruxism presents a distinct detection challenge: distinguishing pathological clenching and grinding from routine daily activities such as chewing and speaking. Despite affecting approximately 20\% of the adult population~\cite{manfredini2013epidemiology}, the condition frequently remains undetected until substantial dental erosion, temporomandibular joint disorders, or chronic facial and head pain manifest~\cite{lavigne2008bruxism}.International consensus on bruxism assessment emphasizes the need for objective measurement methods that can operate outside clinical settings~\cite{lobbezoo2018international}. Even for cases where clinical diagnosis has been established through established metrics (such as Standardized Tool for the Assessment of Bruxism (STAB) \cite{manfredini2024standardised})
+substantial need for monitoring of disease progression, response to treatment, and in support of just-in-time (JIT) \textit{in vivo} interventions exists.
+
+Current diagnostic approaches rely on polysomnography or specialized clinical electromyography (EMG) systems and clinical assessment. These methods require specialized facilities, trained technicians, and often necessitate overnight clinical stays, creating logistical challenges that limit patient access.  Cost and geographic constraints to providing care to rural and other difficult to access vulnerable populations reduce the reach of traditional diagnostic approaches. Many individuals remain undiagnosed until irreversible damage has occurred, despite the condition's treatability when detected early. For ongoing monitoring, recent proposals for 24-hour recording devices aim to mitigate these barriers by assessing masseter muscle work in natural environments \cite{colonna2023electromyographic}. However, these approaches present substantial concerns with respect to privacy and the form factor of video camera placement, in addition to substantial data processing demands.
+
+These limitations and diagnostic gaps motivate the development of clinically adequate detection systems that prioritize accessibility over hospital-grade precision. A system achieving sufficient accuracy for screening purposes, while requiring very inexpensive sensors and minimal technical expertise, could substantially expand the population receiving timely diagnosis. This approach accepts a pragmatic trade-off: marginally reduced precision in exchange for dramatically improved accessibility, earlier intervention, and the capacity for continuous remote monitoring.
+
+The introduction of affordable wearable sensors presents an opportunity for realizing this vision~\cite{gul2024advanced}. However, distinguishing awake bruxism from other oral activities, particularly chewing, remains challenging due to overlapping myoelectric signatures~\cite{stuginski2016detection}. This work presents a pilot study addressing this challenge through multi-modal sensor fusion, combining surface EMG with audio signals to exploit the acoustic distinctiveness of different oral activities. By leveraging complementary information from two low-cost sensor modalities, we demonstrate proof of concept that clinically useful detection of awake bruxism is achievable without the complexity of traditional diagnostic instrumentation.
+
+
+ In this paper, we describe the hardware and core technical pipeline for a bruxism detection system using pilot data on awake bruxing as a use case. Our goal is to assess the baseline feasibility of a multimodal sensor assembly comprised of wired EMG and wireless audio in the lab. We undertake several specific objectives in our work. First, we introduce a dual-branch neural network architecture that processes the EMG and audio signals through separate pathways with modality-specific wavelet decomposition, enabling optimized feature extraction for each signal type. Second, we provide empirical evidence that audio fusion improves classification accuracy by 14.2 percentage points ($p < 0.001$), primarily by resolving confusion between acoustically distinct activities such as chewing and grinding. Third, we present a comprehensive preprocessing pipeline optimized for facial EMG, including adaptive filtering and class imbalance mitigation strategies. Fourth, we conduct a systematic evaluation using leave-one-subject-out cross-validation to monitor the model's ability to generalize to individuals whose data were excluded during the training phase.
+
+
+
+\subsection{Research Questions}
+
+The work presented in this report reflects initial results of a small-scale study of daytime bruxing behavior. The overall goal of our work in this area is to develop technologies to track bruxing in real-time and support associated treatment modalities. This work investigates three research questions:
+
+\begin{itemize}
+    \item \textbf{RQ1} tests whether affordable sensors, specifically surface EMG and microphones, have the sufficient signal quality for real-time bruxism detection, when placed over the condyle bone.
+    \item \textbf{RQ2} examines how effective EMG-audio fusion is in distinguishing physiologically similar but acoustically and electrically distinct activities.
+    \item \textbf{RQ3} examines whether separating the audio and EMG signals into dedicated processing pathways with frequency-specific filtering outperforms standard, single-pathway models when analyzing physiological data.  
+\end{itemize}
+
+
+
+
+
+
+
+ \section{Prior Technical Advances}
+
+\subsection{EMG-Based Bruxism Detection}
+
+Surface electromyography has emerged as the primary modality for ambulatory bruxism detection due to its direct measurement of masticatory muscle activity~\cite{raez2006techniques}. Early portable systems demonstrated the feasibility of home-based EMG monitoring, though they suffered from limited specificity in distinguishing bruxism from other nocturnal orofacial activities~\cite{stuginski2016detection}. Castroflorio et al.~\cite{castroflorio2013use} proposed combining EMG with electrocardiographic signals to improve detection in natural environments, achieving improved specificity through heart rate variability analysis during bruxism episodes.
+
+Recent advances have focused on machine learning approaches for EMG-based classification. Sonmezocak and Kurt~\cite{sonmezocak2021detection} demonstrated that neural networks with autoregressive and wavelet entropy features could effectively diagnose bruxism from wired EMG signals, achieving classification accuracy exceeding 90\% on controlled datasets across four classes (jaw opening, jaw clenching, rhythmical teeth grinding, Fatigue/pain.) Gul et al.~\cite{gul2024advanced} extended this work to accommodate multiple sleeping postures, applying bandpass filtering and time-domain feature extraction with machine learning classifiers. Heyat et al.~\cite{heyat2020computational} introduced an ensemble classification approach combining electroencephalogram (EEG), electrocardiogram (ECG), and EMG signals, demonstrating that multi-modal physiological signals improve bruxism recognition compared to single-modality approaches. Furthermore, comparative studies have highlighted distinct surface EMG patterns between centric and eccentric bruxism, aiding in the differentiation of clenching and grinding behaviors \cite{lan2022comparative}.
+
+\subsection{Acoustic and Wearable Detection}
+
+Acoustic monitoring represents a complementary approach to EMG-based detection. Romano et al.~\cite{romano2024wearable} investigated the placement of acoustic transducers across the head for detecting voluntary oral behaviors, finding that microphone position significantly affects detection accuracy for teeth grinding and jaw clenching; they concluded that ear-based placement is optimal for continuous monitoring due to its superior signal stability, high recording strength, and ergonomic viability.  Martinot et al.~\cite{martinot2021artificial} demonstrated that artificial intelligence analysis of mandibular movements could accurately detect phasic sleep bruxism in patients with obstructive sleep apnea, achieving high sensitivity through gradient boosting classifiers. Also, various hardware implementations have been patented, including automatic detection systems that adapt to background signal levels \cite{haugland2020automatic} and wearable chin-mounted accelerometer systems \cite{patwa2017bruxism}.
+
+\subsection{Signal Processing for EMG Classification}
+
+Wavelet decomposition has become standard for EMG feature extraction due to its joint time-frequency resolution~\cite{englehart2003robust}. Phinyomark et al.~\cite{phinyomark2012feature} provided a comprehensive analysis of feature extraction and selection methods for EMG classification, demonstrating that wavelet-based features outperform time-domain features for complex gesture recognition. Chowdhury et al.~\cite{chowdhury2013surface} reviewed surface EMG processing techniques, emphasizing the importance of appropriate filter design for preserving physiologically relevant frequency components while removing noise and artifacts.
+
+\subsection{Deep Learning for Physiological Signals}
+
+Deep learning has transformed physiological signal classification by enabling automatic feature learning~\cite{faust2018deep}. Convolutional neural networks have demonstrated particular success in EMG-based gesture recognition, as reviewed by Tsinganos et al.~\cite{tsinganos2019improved}, who showed that temporal convolutional networks improve upon traditional machine learning approaches. For imbalanced biomedical datasets, Lin et al.~\cite{lin2017focal} introduced focal loss, which down-weights easy examples to focus learning on hard samples. Johnson and Khoshgoftaar~\cite{johnson2019survey} surveyed class imbalance handling strategies for deep learning, finding that loss function modifications often outperform sampling-based approaches for physiological signal classification.
+
+Despite promising progress, the literature lacks a systematic feasibility analysis of affordable, single- or dual-sensor solutions capable of supporting real-time bruxism detection in future free-living applications.
+
+
+
+\section{Results}
+\subsection{Main Results and Modality Ablations}
+
+Table~\ref{tab:results} compares the proposed dual-branch architecture against baseline methods. The Wavelet Dual-Branch CNN achieves 81.8\% accuracy (95\% CI: 79.9\%--83.5\%) and 80.0\% F1-score (95\% CI: 78.1\%--81.8\%), substantially outperforming both traditional machine learning and recurrent neural network approaches. The bidirectional Long Short-Term Memory (LSTM) baseline, which processes raw signals through recurrent layers to capture temporal dependencies, achieves 76.4\% accuracy, representing the strongest baseline but still falling 5.4 percentage points short of the proposed method. This performance gap suggests that the explicit multi-resolution frequency decomposition provided by wavelets captures discriminative patterns that sequential modeling alone cannot extract. All pairwise comparisons between the proposed method and baselines are statistically significant ($p < 0.001$, McNemar's test with Bonferroni correction).
+
+
+To quantify the contribution of each sensing modality, we conducted a systematic ablation study comparing EMG-only, audio-only, and fused configurations. Table~\ref{tab:modality_ablation} presents the results. The EMG-only model achieves 67.6\% accuracy, while the audio-only model achieves 58.3\% accuracy, indicating that EMG provides the stronger individual signal for this classification task. However, the fusion of both modalities yields 81.8\% accuracy, representing a 14.2 percentage point improvement over EMG-only ($p < 0.001$) and a 23.5 percentage point improvement over audio-only ($p < 0.001$).
+
+Analysis of per-class performance reveals that audio signals especially benefits chewing detection. In the EMG-only configuration, 24.1\% of chewing samples were misclassified as grinding due to overlapping myoelectric signatures. With audio fusion, this misclassification rate drops to 3.8\% ($p < 0.001$). The acoustic signatures of mastication, which are rhythmic and food-dependent, are distinct from grinding, which produces sustained high-frequency contact sounds, enabling reliable disambiguation even when EMG patterns converge.
+
+
+% ==========================================
+% COMBINED PAGE-WIDE TABLES (3, 4, and 5)
+% ==========================================
+\begin{table*}[t]
+  \centering
+  
+  % --- TABLE 3 ---
+  \caption{Classification Performance Comparison. All differences between the proposed method and baselines are statistically significant ($p < 0.001$).}
+  \label{tab:results}
+  \begin{tabular}{lcccc}
+    \toprule
+    Method & Acc. & Prec. & Rec. & F1 \\
+    \midrule
+    \textbf{Wavelet Dual-Branch CNN} & \textbf{81.8\%} & \textbf{79.2\%} & \textbf{80.8\%} & \textbf{80.0\%} \\
+    Bidirectional LSTM & 76.4\% & 74.8\% & 75.9\% & 75.3\% \\
+    Wavelet + Random Forest & 72.5\% & 71.0\% & 72.5\% & 71.7\% \\
+    Raw EMG + CNN & 68.3\% & 66.8\% & 68.3\% & 67.5\% \\
+    Wavelet + MLP & 66.4\% & 63.8\% & 64.3\% & 64.1\% \\
+    \bottomrule
+  \end{tabular}
+  
+  \vspace{2.5em} % Adds vertical space between the tables
+  
+  % --- TABLE 4 ---
+  \caption{Modality Ablation Study. The fusion configuration significantly outperforms both single-modality baselines.}
+  \label{tab:modality_ablation}
+  \begin{tabular}{lccccc}
+    \toprule
+    Configuration & Acc. & Prec. & Rec. & F1 & $\Delta$ Acc. \\
+    \midrule
+    Audio Only & 58.3\% & 55.1\% & 56.8\% & 55.9\% & -- \\
+    EMG Only & 67.6\% & 65.2\% & 66.4\% & 65.8\% & +9.3\% \\
+    \textbf{EMG + Audio} & \textbf{81.8\%} & \textbf{79.2\%} & \textbf{80.8\%} & \textbf{80.0\%} & \textbf{+14.2\%} \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{2.5em} % Adds vertical space between the tables
+
+  % --- TABLE 5 ---
+  \caption{Per-Class Performance with 95\% Confidence Intervals}
+  \label{tab:perclass}
+  \begin{tabular}{lcccc}
+    \toprule
+    Class & Precision & Recall & F1 & Support \\
+    \midrule
+    Movement & 78.3\% & 82.1\% & 80.2\% & 357 \\
+    Clenching & 71.5\% & 68.9\% & 70.2\% & 476 \\
+    Grinding & 74.8\% & 76.4\% & 75.6\% & 354 \\
+    Chewing & 94.2\% & 96.0\% & 95.1\% & 1,066 \\
+    \midrule
+    \textbf{Weighted Avg} & \textbf{79.2\%} & \textbf{80.8\%} & \textbf{80.0\%} & 2,253 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=0.7\linewidth]{Figures/wavelet_training_results_1.png}
+  
+  \includegraphics[width=0.7\linewidth]{Figures/wavelet_training_results_2.png}
+  
+  \vspace{1em}
+  \caption{Training dynamics showing loss curves on top and accuracy curves on the bottom. Early stopping prevents overfitting while achieving stable convergence.}
+  \label{fig:loss_curves}
+\end{figure}
+
+
+\subsection{Class-Level Diagnostics}
+
+
+Table~\ref{tab:perclass} presents per-class metrics with 95\% confidence intervals. The Chewing class achieves the highest performance with an F1-score of 95.1\% (95\% CI: 93.8\% -- 96.2\%). This increased performance can be attributed to the distinct rhythmic, broadband acoustic signatures of mastication, which are captured by the audio branch of our model. 
+In contrast, the Clenching class exhibits the lowest F1-score at 70.2\% (95\% CI: 66.4\% --73.8\%). This lower performance reflects the physiological ambiguity between clenching and grinding, as both involve sustained masseter muscle activation without the rhythmic variation seen in chewing. Grinding achieves a moderate F1-score of 75.6\%, with primary misclassifications occurring against the clenching class, consistent with the feature space overlap observed in Figure~\ref{fig:tsne}. Movement is relatively well-distinguished (F1: 80.2\%) due to the dynamic temporal patterns that differentiate it from the static nature of clenching.
+
+
+
+
+
+
+To examine the learned representations, we applied t-distributed stochastic neighbor embedding (t-SNE) dimensionality reduction \cite{vandermaaten2008visualizing} to the 72-dimensional feature vectors extracted from the fusion layer. Figure~\ref{fig:tsne} visualizes the resulting 2D embedding. The chewing class (red) forms relatively distinct clusters, consistent with its high classification accuracy. Movement (blue) and clenching (orange) exhibit partial separation but with notable overlap in certain regions. Grinding (green) samples are distributed across multiple clusters, reflecting the heterogeneous nature of bruxism episodes and their physiological similarity to clenching. This visualization corroborates the confusion matrix's results and illustrates why the clenching-grinding distinction remains the primary classification challenge.
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=0.8\linewidth]{Figures/tsne_2d.png}
+  \caption{t-SNE visualization of the learned feature space. Chewing samples form distinct clusters while clenching, grinding, and movement exhibit partial overlap, reflecting the classification difficulty hierarchy.}
+  \Description{2D scatter plot showing four classes of data points with chewing forming separate clusters and other classes showing overlap.}
+  \label{fig:tsne}
+\end{figure*}
+
+Figure~\ref{fig:confusion} presents the confusion matrix. Chewing is reliably distinguished from all other classes, validating the benefit of audio fusion. The overlap between clenching and grinding accounts for the majority of errors, reflecting genuine physiological similarity in the form of sustained masseter and temporalis co-contraction. Movement exhibits minimal confusion with grinding, as the dynamic nature of jaw movements produces distinct temporal patterns.
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{Figures/confusion_matrix_wavelet_4classes.png}
+  \caption{Confusion matrix for 4-class classification. Chewing is reliably distinguished while residual errors concentrate on clenching and grinding confusion.}
+  \Description{4x4 confusion matrix showing high diagonal values, particularly for chewing, with some off-diagonal confusion between clenching and grinding.}
+  \label{fig:confusion}
+\end{figure*}
+
+\subsection{Training Dynamics}
+
+Figure~\ref{fig:loss_curves} shows training and validation curves. The model converges within 40 epochs, with early stopping triggered at epoch 52. The modest train-validation gap of less than 10\% indicates effective regularization.
+
+
+\section{Computational Efficiency}
+
+The proposed dual-branch architecture was designed with computational efficiency as one of the primary considerations to enable real-time inference on resource-constrained devices. The model contains approximately 15,000 trainable parameters, substantially fewer than typical deep learning architectures for physiological signal classification. This compact design results from the reduced channel capacity in the CNN branches (8$\rightarrow$16 for EMG, 4$\rightarrow$8 for audio) and the shallow fusion MLP (72$\rightarrow$48$\rightarrow$32$\rightarrow$4). On a standard CPU (Intel i7-12750H), inference latency for a single 1-second window averages 12.3~ms, well within the real-time budget for continuous monitoring applications, especially when using 1-second signal windows. GPU inference (NVIDIA RTX 4090) reduces latency to 1.8~ms per window. The wavelet decomposition step, performed using PyWavelets, accounts for approximately 40\% of total inference time. Memory footprint during inference is approximately 2.3~MB, making the model suitable for deployment on embedded systems and wearable microcontrollers with limited RAM.
+
+
+\section{Discussion}
+
+This study validates the feasibility of using low-cost sensors for bruxism detection. We organize our discussion by explicitly addressing the three research questions posed in the introduction.
+
+\subsection{Feasibility of Affordable Sensors (RQ1)}
+Question 1 asked whether affordable surface EMG and microphone sensors provide sufficient signal quality for real-time detection. Our results affirmatively answer this question. The proposed system achieves an overall accuracy of 81.8\% and an F1-score of 80.0\% using low-cost hardware components. While this does not match the precision of clinical polysomnography, it meets the requirements for a screening and behavioral intervention tool where accessibility is the priority. Furthermore, the computational efficiency analysis confirms the system's viability for real-time edge deployment, with an inference latency of 12.3~ms per window on a standard CPU. This demonstrates that hospital-grade instrumentation is not a prerequisite for effective monitoring of parafunctional habits.
+
+\subsection{Efficacy of Sensor Fusion (RQ2)}
+Question 2 examined how effective EMG-audio fusion is in distinguishing physiologically similar but acoustically distinct activities. The results show that the 14.2 percentage point accuracy improvement from audio fusion ($p < 0.001$) stems from the acoustic distinctiveness of oral activities.
+
+Figure~\ref{fig:signal_comparison} illustrates the contrasting signal characteristics of grinding and chewing across both EMG and microphone modalities. The grinding EMG signal exhibits sustained, high-amplitude activation across both channel pairs with chaotic, dense patterns characteristic of pathological teeth grinding. In contrast, the chewing EMG shows rhythmic bursts with clear intervals of relaxation between mastication cycles. The corresponding microphone signals reveal complementary acoustic signatures: grinding produces sustained contact sounds, while chewing generates rhythmic, broadband patterns modulated by food properties~\cite{romano2024wearable}. These signatures persist even when myoelectric patterns converge, enabling disambiguation. This finding aligns with prior work demonstrating that multi-modal physiological signals improve recognition compared to single-modality approaches~\cite{heyat2020computational}.
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=0.8\linewidth]{grinding all emg channels.png}
+  
+  \small (a) Grinding EMG
+  
+  \includegraphics[width=0.8\linewidth]{Gum all emg channels.png}
+  
+  \small (b) Chewing EMG
+  
+  \vspace{1em}
+  \caption{Comparison of EMG signal patterns. (a) Grinding exhibits sustained, high-amplitude, chaotic activation across channels. (b) Chewing shows rhythmic bursts with relaxation intervals, particularly visible in the initial portion of the signal.}
+  \label{fig:signal_comparison}
+\end{figure*}
+
+\subsection{Architectural Optimization (RQ3)}
+Question 3 explored what architectural choices optimize performance on small, imbalanced datasets. Our analysis shows that the dual-branch design with modality-specific wavelets outperforms both early fusion approaches and sequential modeling alternatives. The bidirectional LSTM baseline, despite its capacity to model temporal dependencies, achieves 76.4\% accuracy compared to 81.8\% for the proposed method. This 5.4 percentage point gap suggests that explicit multi-resolution frequency decomposition captures discriminative patterns that recurrent processing of raw signals cannot extract.
+
+We attribute the success of modality-specific wavelets to two factors. First, there is a frequency range mismatch between modalities, as EMG content concentrates below 450~Hz while audio extends higher. Modality-specific decomposition levels accommodate these differences. Second, optimal wavelet selection differs by modality. Daubechies wavelets match EMG transient morphology~\cite{englehart2003robust}, whereas Coiflets provide superior frequency localization for spectral audio features.
+
+Two approaches that did not improve performance also merit discussion regarding this research question. First, models pretrained on arm and leg EMG datasets failed to transfer to facial muscles, likely due to differences in motor unit recruitment patterns and electrode geometry~\cite{jiang2012myoelectric}. Second, Synthetic Minority Over-sampling Technique (SMOTE) corrupted the temporal structure of bio-signals, degrading performance. This finding aligns with recommendations against SMOTE for time-series data~\cite{johnson2019survey}.
+
+\subsection{Limitations}
+Several limitations constrain the generalizability of our findings. The primary limitation of this study is the sample size ($N=5$). While the high data density (11,845 windows) provides statistical power for validating the signal processing pipeline, the small cohort limits our ability to generalize to the broader population's anatomical variability. Thus, this work should be interpreted as a feasibility study justifying the sensor fusion approach rather than a full clinical validation. Also, data was collected in a controlled laboratory setting, whereas real-world deployment faces additional challenges including motion artifacts, ambient noise, and electrode placement variability. 
+
+The 70.2\% F1-score for clenching also reflects a genuine physiological continuum rather than simple model error. Grinding episodes frequently begin with or contain phases of static clenching before lateral movement initiates. Consequently, short analysis windows of a ``grinding episode may arguably be physiologically identical to ``clenching," leading to inevitable label noise in window-based classification. From a therapeutic perspective, both clenching and grinding represent parafunctional habits requiring similar behavioral interventions; thus, misclassification between these two classes is clinically less critical than misidentifying natural movement or chewing as pathology~\cite{lobbezoo2018international}. Additionally, the current system classifies discrete activity windows rather than detecting activity onset and offset in continuous streams, which would be necessary for practical deployment.
+
+\section{Conclusion and Broader Impacts}
+
+
+We presented a dual-branch wavelet CNN for real-time bruxism detection using surface EMG and audio signals. The system achieves 81.8\% accuracy across four oral activity classes, outperforming bidirectional LSTM (76.4\%), random forest (72.5\%), and MLP (66.4\%) baselines. Audio fusion provides a statistically significant 14.2 percentage point improvement over EMG-only configurations ($p < 0.001$). The key insight is that acoustically distinct activities such as chewing and grinding can be reliably separated even when myoelectric signatures overlap, and that explicit wavelet decomposition captures discriminative frequency patterns more effectively than end-to-end sequential modeling. By demonstrating clinically useful detection with low-cost sensors, this work advances accessible screening solutions that could expand early diagnosis to under-served communities and enable timely interventions.
+
+
+The leave-one-subject-out validation provides evidence that the learned representations generalize to unseen individuals, supporting the validity of our approach for awake bruxism detection. To build a more generalizable model capable of detecting finer-grained behavioral patterns, future work will expand data collection to include a larger and more demographically diverse participant pool spanning different age groups, bruxism severity levels, and dental conditions. Several additional directions emerge from this work. Hybrid architectures combining wavelet decomposition with Transformer attention mechanisms may capture longer-range dependencies and improve the distinction between clenching and grinding. Quantization and pruning would also enable deployment on wearable microcontrollers.
+
+Beyond detection, the proposed sensing framework has direct implications for rehabilitation and behavioral intervention. Reliable real-time identification of bruxism episodes creates opportunities for just-in-time (JIT) interventions, in which detection of aberrant masticatory muscle activity can trigger immediate feedback or therapeutic responses. Such interventions may include vibrotactile or auditory cues to promote jaw relaxation, biofeedback-based motor retraining, or context-aware behavioral prompts aimed at reducing parafunctional activity. Over time, these closed-loop approaches could support motor learning, enhance patient self-awareness, and facilitate sustained behavior change. Importantly, integration of low-cost, wearable sensing with adaptive intervention delivery enables scalable, home-based rehabilitation strategies that extend beyond episodic clinical visits, aligning with contemporary models of personalized and preventive care.
+
+
+
+\section{Method}
+
+This section details the experimental design employed to validate the proposed detection system. We describe the study protocol, the data acquisition hardware, and each component of our data acquisition and handling, our preprocessing pipeline, and model architecture and evaluation. Additionally, we provide statistical specifications of the collected signal windows used for training and evaluation.  This study was conducted in accordance with the ethical standards of the Institutional Review Board (IRB) and the protocol approved by the University of Rhode Island (\#IRB2275690-2). 
+
+\subsection{Study Protocol}
+\textit{Participants.} Flyers, emails to local oral care and physical therapy providers, and word of mouth, were employed to recruit participants aged 18-65 for a ``Tracking the Tooth Grinding Study". Recruitment specifically targeted individuals with clinically confirmed bruxism to ensure that the bruxism recordings captured authentic pathological grinding patterns. Participants (2 females, 3 males, aged $38.0 \pm 10.4$ years) provided written informed consent after receiving detailed information about the study procedures, data handling, and their right to withdraw at any time. Following each recording session, participants completed a post-session survey documenting their experience, any discomfort during the procedure, and feedback on the experimental protocol. All participants received compensation in the form of a gift card upon completion of the study. The collected data was de-identified and stored securely, accessible only to authorized research personnel.
+
+\textit{Procedure.} The data collection session began with written consent and a pre-screening survey regarding bruxism behavior. Surface EMG electrodes, an omnidirectional microphone, and a camera were positioned and secured. The recording consisted of two phases: baseline data collection and natural behavior data collection. During the baseline phase, participants recorded 1 minute of quiet rest. They then performed 5 repetitions of distinct jaw movements, including opening/closing, left/right deviation, protrusion/retrusion, and left/right biting. This was followed by 1-minute sessions of isometric molar and incisor clenching, alternating 3 seconds on and 3 seconds off. 
+
+Following a break, participants entered the natural behavior phase. They performed 3-minute continuous trials of emulating natural bruxing, chewing cheese, chewing baby carrots or popcorn, and chewing gum. Each of these tasks was repeated 3 times with a 1-minute rest interval between repetitions to prevent muscle fatigue. To establish precise temporal boundaries for signal windowing, each participant was provided with a handheld button that transmitted event markers synchronized with the physiological recordings. Participants were instructed to press the button immediately upon initiating each activity class.
+
+
+\subsection{Dataset Specifications}
+
+The dataset used in this work is comprised of recordings from 5 participants, all of whom had clinically confirmed bruxism as a prerequisite for study enrollment. This recruitment criterion was deliberately established to ensure ecological validity of the bruxism class: the grinding episodes captured in this dataset reflect genuine pathological activity rather than simulated behaviors. Healthy individuals without bruxism history were excluded, as prior research has demonstrated that voluntary teeth grinding by those without this condition fails to replicate the characteristic intensity, duration, and muscle activation patterns of authentic bruxism episodes~\cite{lavigne2008bruxism}.  The button pressed described in the procedure provided precise temporal boundaries for segmenting continuous recordings into labeled epochs. The experimenter visually confirmed activity onset to validate trigger timing. To account for human reaction time latency and ensure labeling consistency, a 0.5-second interval was applied around each event transition, and the ambiguous boundary windows were excluded from the analysis. Ground truth labels were established through a trigger-based annotation protocol.
+
+Data was acquired two pairs of bipolar surface EMG channels positioned over the unilateral masseter and temporalis muscles, and one omnidirectional microphone positioned near the temporomandibular joint, as illustrated in Figure~\ref{fig:sensor_setup}. All signals were sampled at 1200~Hz. While the subject count (N=5) reflects a pilot feasibility scope, the high sampling rate and windowing strategy generate a substantial dataset of 11,845 distinct feature windows, providing sufficient density for the convergence of the proposed deep learning architecture.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{Figures/patient_new.png}
+  \caption{Sensor placement configuration for multimodal data acquisition. Bipolar surface EMG electrode pairs are positioned over the temporalis (EMG-T) and masseter (EMG-M) muscles to capture myoelectric activation. A microphone (MIC) is also secured near the temporomandibular joint to record the complementary acoustic signatures of oral activities.}
+  \Description{Photograph showing a participant with surface EMG electrodes attached to the face over the jaw muscles, with wires leading to recording equipment.}
+  \label{fig:sensor_setup}
+\end{figure}
+
+The original activity taxonomy was consolidated into 4 categories to improve generalization on the limited dataset and group semantically similar activities. The \textbf{Movement} category encompasses three original classes: jaw opening and closing, lateral deviation, and protrusion and retrusion. The \textbf{Clenching} category combines four original classes: molar clench, incisor clench, and unilateral bite on the left and right sides. This static loading directly corresponds to centric bruxism as defined in clinical literature~\cite{lobbezoo2018international}. The \textbf{Grinding} category represents bruxism episodes performed by participants with the diagnosed condition, capturing the pathological, dynamic grinding patterns that distinguish clinical bruxism from voluntary teeth contact. This aligns with eccentric bruxism, cementing the dichotomy between clenching and grinding established in ~\cite{lobbezoo2018international, manfredini2024standardised}. The \textbf{Chewing} category consolidates three food-based mastication tasks: cheese, carrots, and chewing gum.
+
+
+This initial 11-task protocol was designed to capture a comprehensive spectrum of routine masticatory biomechanics, varying acoustic food profiles, and static versus dynamic muscle activations. Consolidating these 11 activities into 4 broad categories groups physiologically similar behaviors while maintaining clinically meaningful distinctions. \cite{farella2008masticatory}
+
+
+
+\begin{figure*}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{Figures/bite left channel 4 emg.png}
+  \caption{EMG preprocessing pipeline. The visualization tracks a single 1-second window from Channel 4 through sequential conditioning stages: the \textbf{Raw} signal (blue) exhibiting low-frequency drift; \textbf{Notch filtering} (orange) at 60 Hz to remove power line interference; \textbf{Bandpass filtering} (green) (20--450 Hz) combined with \textbf{Baseline removal} (red) to eliminate motion artifacts and drift; and final \textbf{Normalization} (purple) to standardize amplitude prior to wavelet decomposition. }
+  
+  \label{fig:emg_preprocessing}
+\end{figure*}
+
+
+
+Table~\ref{tab:dataset} summarizes the dataset specifications. Continuous signals were segmented using a sliding window approach; a window size of 1.0 s (1200 samples) was advanced by a stride of 0.5 s (600 samples), resulting in a 50\% overlap between consecutive windows. This segmentation yielded 11,845 samples with moderate class imbalance, exhibiting a 3:1 ratio between majority and minority classes.
+
+\begin{table}[h]
+  \caption{Dataset Statistics}
+  \label{tab:dataset}
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}ll@{}}
+    \toprule
+    Property & Value \\
+    \midrule
+    Subjects & 5 \\
+    EMG channels & 2 \\
+    Microphone channels & 1 \\
+    Sampling rate & 1200 Hz \\
+    Window size & 1200 samples (1.0 s) \\
+    Stride & 600 samples (0.5 s) \\
+    Total Signal windows & 11,845 \\
+    Classes (reduced) & 4 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+The proposed bruxism detection framework consists of a multi-stage pipeline designed for real-time inference on edge devices. We detail the preprocessing steps for EMG and audio signals, the modality-specific wavelet decomposition strategies, and the dual-branch neural network architecture employed for feature fusion and classification. The training configuration and hyperparameter optimization process are also presented.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.75\textwidth]{Figures/pipeline.png}
+  \caption{Dual-branch architecture. EMG (red lines) and audio signals (red lines) undergo modality-specific wavelet decomposition using Daubechies-4 (db4) wavelets for EMG and Coiflet-5 (coif5) wavelets for audio before processing through parallel CNN branches. Features are concatenated and classified via a fusion MLP. }
+  \centering
+  \Description{Block diagram showing dual processing paths for EMG and audio signals, each with wavelet decomposition and parallel CNN branches, merging into a fusion MLP. }
+  \label{fig:architecture}
+\end{figure*}
+\subsection{Preprocessing and Feature Extraction}
+
+The EMG preprocessing, illustrated in Figure \ref{fig:emg_preprocessing}, pipeline consists of five sequential stages. First, a notch filter at 60~Hz with quality factor Q=30 removes power line interference. Subsequently, a 4th-order Butterworth bandpass filter isolates the physiological EMG frequency range between 20 and 450~Hz, consistent with established EMG processing guidelines~\cite{chowdhury2013surface}. Downsampling is then applied to reduce computational requirements while preserving the frequency content of interest within the Nyquist limit. Fourth, baseline drift is eliminated through high-pass filtering with a 5~Hz cutoff to remove DC offset and slow electrode drift. Finally, signals were normalized using global statistics computed exclusively from the training set to prevent data leakage.
+
+The microphone signal receives minimal preprocessing to preserve acoustic characteristics; Only DC offset removal via mean subtraction and normalization using training set statistics were applied. No filtering is performed, as the relevant acoustic information, including tooth contact and mastication sounds, spans a broad frequency range.
+
+
+
+Following preprocessing, We employ modality-specific wavelet decomposition to extract time-frequency features optimized for each signal type, following the established efficacy of wavelet-based EMG analysis~\cite{phinyomark2012feature}. EMG signals are decomposed using the Daubechies-4 wavelet at 4 levels. 
+The Daubechies-4 (db4) wavelet was selected due to its compact support and resemblance the tri-phasic morphology of motor unit action potentials recorded in facial EMG~\cite{englehart2003robust}. The decomposition yields approximation coefficients $A_4$ capturing frequencies from 0 to 37.5~Hz, and detail coefficients $D_1$ through $D_4$ capturing progressively lower frequency bands from 37.5 to 600~Hz.
+
+Audio signals are decomposed using the Coiflet-5 wavelet at 5 levels. For the audio branch, Coiflet-5 (coif5) was chosen after preliminary testing showed it offered a better balance of vanishing moments and support width, effectively capturing the transient, broadband acoustic features of tooth contact and mastication. The additional decomposition level accommodates the broader frequency content of audio signals. \cite{bharathi2025unveiling}
+
+\subsection{Model Architecture}
+
+The proposed architecture processes EMG and audio through separate branches before fusion, as illustrated in Figure~\ref{fig:architecture}. This design enables modality-specific feature extraction while preserving the ability to learn cross-modal interactions.
+
+The EMG branch employs three parallel CNN sub-branches that process different frequency bands. The low-frequency branch processes approximation coefficients $A_4$, the mid-frequency branch processes detail coefficients $D_3$, and the high-frequency branch processes detail coefficients $D_1$. Each sub-branch consists of two convolutional layers progressing from 8 to 16 channels, with batch normalization, Rectified Linear Unit (ReLU) activation, and adaptive pooling. The three sub-branches produce 48 features in total.
+
+The audio branch follows an analogous three-branch structure for processing audio wavelet coefficients, with reduced channel capacity progressing from 4 to 8 channels to reflect the single-channel input. This branch produces 24 features.
+
+The 72 concatenated features, comprising 48 from EMG and 24 from audio, are processed through a fusion multilayer perceptron (MLP). The network architecture proceeds from 72 to 48 to 32 neurons, with batch normalization, ReLU activation, and dropout at probability 0.6 applied at each layer. The final layer (classification head) maps to $4$ output classes.
+
+
+
+\subsection{Training and Evaluation Configurations}
+
+The dataset exhibits moderate class imbalance with a 3:1 ratio between majority and minority classes. Following recommendations from Johnson and Khoshgoftaar~\cite{johnson2019survey}, we employ three complementary strategies to address this challenge. First, we use Focal Loss~\cite{lin2017focal} with focusing parameter $\gamma=1.5$ to down-weight easy examples and focus learning on hard samples, expressed as $\mathcal{L}_{\text{FL}} = -\alpha_t (1-p_t)^\gamma \log(p_t)$. Second, we apply class weighting using inverse-frequency weights where $\alpha_c$ is proportional to $1/n_c$. Third, we perform selective augmentation applied only to minority classes, including amplitude scaling of $\pm$10\%, Gaussian noise injection, and circular time shifts of $\pm$50 samples.
+
+The model is optimized using Adam with learning rate $7 \times 10^{-5}$ and weight decay $5 \times 10^{-3}$. A ReduceLROnPlateau scheduler decreases the learning rate by factor 0.5 after 7 epochs without improvement, with minimum learning rate $10^{-6}$. Gradient clipping with maximum norm 1.0 stabilizes training. The batch size is 16. Early stopping with patience of 30 epochs is applied after a minimum of 30 training epochs.
+
+
+To assess generalization to unseen individuals, we employ leave-one-subject-out evaluation. For instance, in one fold, Subjects 1 through 4 are used for training while Subject 5 is held out for testing. This protocol prevents data leakage that would occur with random splitting, where windows from the same recording session could appear in both training and test sets.
+
+All reported metrics are computed on the held-out test set. To assess the statistical significance of performance differences between model configurations, we employ paired comparisons of classification accuracy~\cite{demsar2006statistical}. For multi-class metrics including precision, recall, and F1-score, we report 95\% confidence intervals computed via bootstrap resampling with 1,000 iterations~\cite{lehmann2006testing}. A significance threshold of $\alpha = 0.05$ is used throughout, with Bonferroni correction applied for multiple comparisons. 
+To ensure optimal model configuration, hyperparameters were selected through a grid search with 5-fold cross-validation on the training set, maximizing the macro F1-score to account for class imbalance.
+Table~\ref{tab:hyperparameters} details the final values for learning rates, batch sizes, and architecture-specific parameters for all evaluated methods.
+
+
+\begin{table}[h]
+  \caption{Hyperparameter Configurations for Evaluated Methods.}
+  \label{tab:hyperparameters}
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lll@{}}
+    \toprule
+    Method & Hyperparameter & Value \\
+    \midrule
+    \multirow{7}{*}{\shortstack[l]{Wavelet\\Dual-Branch\\CNN}} 
+      & Learning rate & $7 \times 10^{-5}$ \\
+      & Weight decay & $5 \times 10^{-3}$ \\
+      & Dropout & 0.6 \\
+      & Batch size & 16 \\
+      & Focal loss $\gamma$ & 1.5 \\
+      & Early stopping patience & 30 \\
+      & LR scheduler patience & 7 \\
+    \midrule
+    \multirow{5}{*}{\shortstack[l]{Bidirectional\\LSTM}} 
+      & Hidden dimensions & 32 \\
+      & Number of layers & 2 \\
+      & Dropout & 0.5 \\
+      & Learning rate & $1 \times 10^{-4}$ \\
+      & Batch size & 32 \\
+    \midrule
+    \multirow{4}{*}{\shortstack[l]{Random\\Forest}} 
+      & Number of estimators & 200 \\
+      & Maximum depth & 20 \\
+      & Min samples split & 5 \\
+      & Class weight & Balanced \\
+    \midrule
+    \multirow{4}{*}{\shortstack[l]{MLP with\\Static\\Features}} 
+      & Hidden layers & [128, 64] \\
+      & Dropout & 0.5 \\
+      & Learning rate & $1 \times 10^{-3}$ \\
+      & Batch size & 32 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\backmatter
+
+\section*{Data availability}
+The datasets generated and/or analyzed during the current study are not publicly available due to privacy restrictions but are available from the corresponding author on reasonable request.
+
+\section*{Acknowledgements}
+We are thankful for assistance from URI undergraduate and graduate students Anjolaoluwa Akingbile, Jessica Constantine, and Nathan DeSalvo who located and summarized functions of various bruxism devices prior to this project. 
+
+Research reported in this publication was supported by an award from of the Rhode Island Life Science Hub Small Grant Program (Principal Investigator TA Walls; Co-Investigators R Abiri, and M Furmanek.) The resources for this project were also partially supported under National Science Foundation (NSF) grant award ID 2245558 (PI R Abiri). 
+
+\section*{Author contributions}
+MH Farhadi: Methodology, software, analysis, writing - original draft, writing - review \& editing. \\
+Ali Rabiee: Protocol development, software, data curation, data collection, formal analysis, review \& editing. \\
+Rahul Singh: Methodology, validation, writing - review \& editing. \\
+Mariusz P. Furmanek: Conceptualization and study design, research grant development, protocol development, manuscript revision. \\
+Reza Abiri: Conceptualization, project administration, Resources, supervision, writing- review and editing. \\
+Theodore A. Walls: Conceptualization, research grant authorship, protocol development, project oversight, manuscript revision. \\
+All authors read and approved the final manuscript.
+
+\section*{Competing interests}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper. \\
+This study was conducted in accordance with the ethical standards of the institutional review board and approved by the University of Rhode Island Institutional Review Board (Protocol \#IRB22275690-2). Written informed consent was obtained from all individual participants included in the study. Written consent for the publication of identifying images or other personal or clinical details was obtained from the participant featured in the visual materials.
+
+\bibliography{refs}
+\end{document}

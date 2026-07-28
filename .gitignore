@@ -1,0 +1,6 @@
+# Participant / raw data — keep local, do not upload
+Data/
+
+# Nested tooling / OS junk
+.DS_Store
+Thumbs.db

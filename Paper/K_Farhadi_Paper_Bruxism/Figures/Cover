@@ -1,0 +1,27 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{parskip}      % block paragraphs, letter style
+\pagestyle{empty}
+
+\begin{document}
+
+
+
+\vspace{1em}
+\noindent Dear Editors,
+
+We are pleased to submit our manuscript, ``Sensor-based Bruxism Detection with Dual-Branch Wavelet CNNs and Audio-EMG Data Fusion,'' for consideration as an Article in \textit{Scientific Reports}. Awake bruxism affects roughly 20\% of adults yet remains difficult to detect, because pathological grinding must be distinguished from everyday chewing and current diagnosis depends on costly, clinic-based instrumentation. As a proof-of-concept feasibility study, we present a low-cost detection approach that fuses surface electromyography (EMG) and microphone signals through a dual-branch convolutional neural network with modality-specific wavelet features, and we show that adding the acoustic modality substantially improves the separation of chewing from grinding.
+
+We believe this work will interest the broad \textit{Scientific Reports} readership across digital health, biomedical signal processing, and machine learning, as it offers early evidence that clinically useful, real-time-capable bruxism screening is achievable without hospital-grade equipment and outlines a path toward home-based monitoring and just-in-time intervention. The manuscript is original, has not been published previously, and is not under consideration elsewhere; all authors have read and approved the submission and declare no competing interests. We thank you for your consideration.
+
+\vspace{1.5em}
+\noindent Sincerely,
+
+% To insert a scanned signature, replace the blank space below with:
+% \includegraphics[height=2.5em]{signature.png}
+\vspace{3em}
+
+\noindent Reza Abiri, Ph.D.\\
+\textit{On behalf of all co-authors}
+
+\end{document}

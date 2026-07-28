@@ -1,0 +1,28 @@
+# Python dependencies for Real-time Detection of Bruxism Using EMG Signals
+# Install with: pip install -r requirements.txt
+#
+# Note: For PyTorch with CUDA support, visit https://pytorch.org/get-started/locally/
+# and install the appropriate version for your system, then install remaining packages:
+# pip install -r requirements.txt
+
+# Core deep learning framework
+torch>=1.12.0
+
+# Numerical computing
+numpy>=1.21.0
+
+# Data manipulation
+pandas>=1.3.0
+
+# Scientific computing and signal processing
+scipy>=1.8.0
+
+# Machine learning utilities
+scikit-learn>=1.0.0
+
+# Wavelet transforms
+PyWavelets>=1.3.0
+
+# Visualization
+matplotlib>=3.5.0
+
