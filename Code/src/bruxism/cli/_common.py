@@ -15,6 +15,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from bruxism import __version__
+from bruxism.utils import progress
 from bruxism.utils.logging import setup_logging
 
 __all__ = [
@@ -47,7 +48,29 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Console verbosity. The JSON-lines run log always records at DEBUG.",
     )
-    parser.add_argument("--quiet", action="store_true", help="Equivalent to --log-level WARNING.")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Equivalent to --log-level WARNING; also disables progress unless --progress is set.",
+    )
+    parser.add_argument(
+        "--progress",
+        default="auto",
+        choices=list(progress.PROGRESS_MODES),
+        help=(
+            "Live progress display. 'auto' draws bars on a terminal and logs periodic "
+            "progress lines when output is redirected; 'bar' and 'plain' force one of "
+            "those; 'none' disables it. Display only -- it never changes what a run "
+            "computes or writes."
+        ),
+    )
+    parser.add_argument(
+        "--progress-interval",
+        type=float,
+        default=progress.DEFAULT_LOG_INTERVAL_SECONDS,
+        metavar="SECONDS",
+        help="Seconds between progress log lines when bars are not drawn.",
+    )
     return parser
 
 
@@ -91,7 +114,15 @@ def run_cli(
     args: argparse.Namespace,
 ) -> int:
     """Run a command body, turning expected failures into actionable messages."""
-    level = logging.WARNING if getattr(args, "quiet", False) else getattr(args, "log_level", "INFO")
+    quiet = bool(getattr(args, "quiet", False))
+    level = logging.WARNING if quiet else getattr(args, "log_level", "INFO")
+    mode = getattr(args, "progress", "auto")
+    if quiet and mode == "auto":
+        mode = "none"
+    progress.configure(
+        mode,
+        interval_seconds=getattr(args, "progress_interval", progress.DEFAULT_LOG_INTERVAL_SECONDS),
+    )
     setup_logging(level)
     try:
         return main_fn(args)

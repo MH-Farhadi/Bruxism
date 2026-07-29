@@ -40,6 +40,7 @@ from bruxism.data.schema import (
     read_recording_csv,
     validate_columns,
 )
+from bruxism.utils import progress
 from bruxism.utils.io import file_sha256, hash_mapping
 from bruxism.utils.logging import get_logger
 
@@ -688,13 +689,18 @@ def build_manifest(
     )
 
     records = list(
-        _iter_records(
-            discovered,
-            root,
-            sampling_rate_hz,
-            active_policy,
-            probe_video=probe_video,
-            hash_video=hash_video,
+        progress.track(
+            _iter_records(
+                discovered,
+                root,
+                sampling_rate_hz,
+                active_policy,
+                probe_video=probe_video,
+                hash_video=hash_video,
+            ),
+            "reading recordings",
+            total=len(discovered),
+            unit="file",
         )
     )
     manifest_hash = hash_mapping(_summarise_for_hash(records))

@@ -198,6 +198,93 @@ def test_validate_only_writes_a_plan_without_training(synthetic_root, tmp_path):
     assert not (run_dir / "predictions.parquet").exists()
 
 
+def _log_messages(run_dir: Path) -> list[str]:
+    lines = (run_dir / "logs" / "run.log.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line)["message"] for line in lines]
+
+
+def _log_loggers(run_dir: Path) -> set[str]:
+    lines = (run_dir / "logs" / "run.log.jsonl").read_text(encoding="utf-8").splitlines()
+    return {json.loads(line)["logger"] for line in lines}
+
+
+def _one_fast_fold(config_path: Path, root: Path, *extra: str) -> list[str]:
+    """CLI arguments for the cheapest run that still exercises every training stage."""
+    return [
+        "--config",
+        str(config_path),
+        "--data-root",
+        str(root),
+        "--max-folds",
+        "1",
+        "--no-resume",
+        "--set",
+        "selection.max_epochs=1",
+        *extra,
+    ]
+
+
+def test_a_training_run_reports_its_progress(synthetic_root, tmp_path):
+    """A run that takes hours must say what it is doing while it does it."""
+    config_path = _write_config(tmp_path, synthetic_root)
+    args = _one_fast_fold(
+        config_path, synthetic_root, "--progress", "plain", "--progress-interval", "0"
+    )
+    assert run_nested_loso.main(args) == 0
+    messages = _log_messages(tmp_path / "runs" / "itest")
+
+    # The size of the job is stated before any of it runs.
+    assert any(text.startswith("plan: ") and "fold run(s)" in text for text in messages)
+    # Every stage announces itself, with the numbers a reader needs to judge it.
+    assert any("inner search: 1 trial(s) x 4 inner fold(s)" in text for text in messages)
+    assert any("best val_macro_f1=" in text and "at epoch" in text for text in messages)
+    assert any("refitting on" in text and "for exactly" in text for text in messages)
+    assert any("accuracy=" in text and "macro_f1=" in text for text in messages)
+    assert any("remaining" in text for text in messages)
+    # Per-epoch ticks arrive between those milestones rather than dead air.
+    assert any("epoch (" in text and "elapsed" in text for text in messages)
+
+
+def test_progress_display_does_not_change_what_a_run_produces(synthetic_root, tmp_path):
+    """``--progress`` is display only: it must not touch identity, splits or the ledger.
+
+    Both runs write the same run directory, because the output paths are part of the
+    configuration hash -- two runs pointed at different directories could never be
+    compared on identity in the first place.
+    """
+    config_path = _write_config(tmp_path, synthetic_root)
+    run_dir = tmp_path / "runs" / "itest"
+
+    assert (
+        run_nested_loso.main(_one_fast_fold(config_path, synthetic_root, "--progress", "none")) == 0
+    )
+    quiet = pd.read_parquet(run_dir / "predictions.parquet")
+    quiet_bundle = json.loads((run_dir / "run_bundle.json").read_text())
+    quiet_loggers = _log_loggers(run_dir)
+
+    assert (
+        run_nested_loso.main(
+            _one_fast_fold(
+                config_path, synthetic_root, "--progress", "plain", "--progress-interval", "0"
+            )
+        )
+        == 0
+    )
+    loud = pd.read_parquet(run_dir / "predictions.parquet")
+    loud_bundle = json.loads((run_dir / "run_bundle.json").read_text())
+
+    for key in ("config_hash", "manifest_hash", "window_index_hash"):
+        assert quiet_bundle[key] == loud_bundle[key], key
+    # Identical windows, identical fold assignment, identical held-out participant.
+    for column in ("sample_id", "subject_id", "true_label", "outer_fold", "seed"):
+        assert quiet[column].tolist() == loud[column].tolist(), column
+
+    # Only the display differs: the reporter is silent under --progress none. The run log
+    # is appended to, so the second read covers both runs and only needs the new records.
+    assert "bruxism.utils.progress" not in quiet_loggers
+    assert "bruxism.utils.progress" in _log_loggers(run_dir) - quiet_loggers
+
+
 def test_summarize_and_report_regenerate_everything_from_artifacts(synthetic_root, tmp_path):
     config_path = _write_config(tmp_path, synthetic_root)
     run_nested_loso.main(

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +16,11 @@ __all__ = ["JsonLinesHandler", "get_logger", "log_context", "setup_logging"]
 
 _CONSOLE_FORMAT = "%(asctime)s %(levelname)-8s %(name)-28s %(message)s"
 _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+#: Console verbosity chosen by the command line, remembered across re-configuration.
+#: ``setup_logging`` is called a second time once a run directory exists, and that call
+#: must not silently discard ``--log-level DEBUG`` or ``--quiet``.
+_console_level: int | str = logging.INFO
 
 
 class JsonLinesHandler(logging.FileHandler):
@@ -47,7 +51,7 @@ class JsonLinesHandler(logging.FileHandler):
 
 
 def setup_logging(
-    level: int | str = logging.INFO,
+    level: int | str | None = None,
     *,
     log_dir: Path | str | None = None,
     filename: str = "run.log.jsonl",
@@ -57,10 +61,19 @@ def setup_logging(
     Parameters
     ----------
     level
-        Console verbosity. The JSON-lines file always records at DEBUG.
+        Console verbosity. ``None`` keeps whatever the last explicit call selected, so
+        attaching the run-directory log later does not reset the requested verbosity.
+        The JSON-lines file always records at DEBUG.
     log_dir
         When given, a ``filename`` JSON-lines log is written inside it.
     """
+    # Imported here rather than at module scope: progress reporting needs `get_logger`.
+    from bruxism.utils.progress import console_stream
+
+    global _console_level
+    if level is not None:
+        _console_level = level
+
     root = logging.getLogger("bruxism")
     root.setLevel(logging.DEBUG)
     root.propagate = False
@@ -68,8 +81,10 @@ def setup_logging(
         root.removeHandler(handler)
         handler.close()
 
-    console = logging.StreamHandler(stream=sys.stderr)
-    console.setLevel(level)
+    # Writes go through a proxy that defers to `tqdm.write` while a progress bar is live,
+    # so a log record cannot smear a redrawing bar.
+    console = logging.StreamHandler(stream=console_stream())
+    console.setLevel(_console_level)
     console.setFormatter(logging.Formatter(_CONSOLE_FORMAT, datefmt=_DATE_FORMAT))
     root.addHandler(console)
 

@@ -19,6 +19,7 @@ Design constraints this module exists to satisfy:
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -95,6 +96,7 @@ class RecordingCache:
         self.max_resident = max_resident
         self._resident: dict[str, np.ndarray] = {}
         self._order: list[str] = []
+        self._computed = 0  # cache misses filtered so far, reported as progress
 
     @property
     def n_emg_channels(self) -> int:
@@ -138,12 +140,24 @@ class RecordingCache:
         else:
             path = self.cache_dir / f"{recording_id}.{self._cache_key(recording_id)}.npy"
             if not path.is_file():
+                # A cache miss filters a whole recording, which takes long enough to look
+                # like a hang on a cold cache. Misses only happen once per (recording,
+                # filter chain), so reporting each one at INFO is not noise on a warm run.
+                started = time.perf_counter()
                 path.parent.mkdir(parents=True, exist_ok=True)
                 computed = self._compute(recording_id)
                 tmp = path.with_suffix(".tmp.npy")
                 np.save(tmp, computed)
                 tmp.replace(path)
-                logger.debug("cached filtered recording %s", recording_id)
+                self._computed += 1
+                logger.info(
+                    "filter cache miss: built %s in %.1fs (%d of at most %d recording(s))",
+                    recording_id,
+                    time.perf_counter() - started,
+                    self._computed,
+                    len(self.manifest.included),
+                    extra={"recording_id": recording_id, "n_computed": self._computed},
+                )
             array = np.load(path, mmap_mode="r")
 
         self._resident[recording_id] = array

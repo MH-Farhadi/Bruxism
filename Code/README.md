@@ -63,8 +63,8 @@ bruxism-report --runs-root outputs/runs --output-root outputs/paper_bundle \
                --data-root "$BRUXISM_DATA_ROOT"
 ```
 
-Every command supports `--help`, `--data-root`, `--log-level` and, where meaningful,
-`--validate-only`.
+Every command supports `--help`, `--data-root`, `--log-level`, `--progress` and, where
+meaningful, `--validate-only`.
 
 ---
 
@@ -97,6 +97,36 @@ Console scripts are installed by `pip install -e .`. Each is equivalently
 
 Runs are **resumable**: rerunning the same command reuses completed folds, and refuses to
 resume across a changed configuration, manifest or window index.
+
+### Watching a run
+
+A training command states the size of the job before it starts, then reports every stage as
+it happens: the plan, each hyperparameter trial and inner fold, per-epoch loss and
+objective, the refit, the held-out score for each participant, and how much wall clock is
+left.
+
+```
+plan: 1 condition(s) x 3 seed(s) x 5 outer fold(s) = 15 fold run(s); 9 model fit(s) per
+      fold (2 trial(s) x 4 inner fold(s), then 1 refit); device=cuda
+fold 3/15 five_class S03:  13%|█▎        | 2/15 [38:24<4:09:36, 19.2min/fold]
+  inner search trial01 fold 2/4 val=S04:  38%|███▊      | 6/16 [09:12<15:20, 92.0s/fit]
+    epochs:  42%|████▏     | 25/60 [00:33<00:47, 1.35s/epoch, loss=0.612, val_loss=0.88,
+                                                              val_macro_f1=0.487]
+```
+
+| Situation | Flag |
+|---|---|
+| Terminal | nothing — bars are drawn automatically |
+| `nohup`, `tee`, CI, a log file | nothing — the same progress arrives as periodic log lines |
+| Force one or the other | `--progress bar` / `--progress plain` |
+| Silence it | `--progress none` (or `--quiet`) |
+| Change the log-line cadence | `--progress-interval 120` (default 30 s) |
+| Per-epoch detail on the console | `--log-level DEBUG` |
+
+`--progress` is display only and is not part of the configuration hash: the same run
+produces the same artifacts with bars, with log lines or with nothing. Every progress
+milestone is also written to `outputs/runs/<run_id>/logs/run.log.jsonl` regardless, at
+DEBUG, one JSON object per line.
 
 ### Evaluate and produce figures
 

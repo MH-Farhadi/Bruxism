@@ -24,7 +24,7 @@ from __future__ import annotations
 import copy
 import itertools
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -53,6 +53,7 @@ from bruxism.training.selection import (
     select_best_trial,
     select_epoch_budget,
 )
+from bruxism.utils import progress
 from bruxism.utils.io import atomic_write_bytes, file_sha256
 from bruxism.utils.logging import get_logger
 from bruxism.utils.reproducibility import SeedBundle, seed_everything, worker_init_fn
@@ -73,6 +74,13 @@ def resolve_device(preference: str) -> torch.device:
     if preference == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     raise ValueError(f"unknown device preference {preference!r}")
+
+
+def _describe_hyperparameters(overrides: Mapping[str, Any]) -> str:
+    """Compact rendering of one trial's hyperparameters, for progress and log lines."""
+    if not overrides:
+        return "config defaults"
+    return " ".join(f"{key}={value}" for key, value in sorted(overrides.items()))
 
 
 @dataclass
@@ -329,11 +337,20 @@ class NestedLOSOTrainer:
         max_epochs: int,
         capture_best: bool,
         disable_early_stopping: bool = False,
+        label: str = "epochs",
+        bar_label: str = "epochs",
+        eval_name: str = "val",
     ) -> tuple[list[EpochRecord], dict[str, torch.Tensor] | None, BruxismModel]:
         """Train, recording per-epoch validation metrics.
 
         When ``capture_best`` is set, the state dict at the best epoch is **deep-copied**
         so subsequent optimiser steps cannot mutate it.
+
+        ``label`` names this fit in log lines and ``bar_label`` is its shorter form for a
+        drawn bar, which already sits under a bar naming the fold. ``eval_name`` names what
+        the per-epoch evaluation was measured on -- ``"val"`` for an inner fold, ``"fit"``
+        for the final refit, whose numbers come from the training data and are a fit
+        diagnostic rather than validation.
         """
         seed_everything(seed, deterministic=training.deterministic)
         model = self._build_model()
@@ -363,42 +380,79 @@ class NestedLOSOTrainer:
         best_value = -np.inf
         stale = 0
 
-        for epoch in range(1, max_epochs + 1):
-            train_dataset.set_epoch(epoch)
-            train_loss = self._train_one_epoch(
-                model, train_loader, criterion, optimizer, grad_clip=training.grad_clip_norm
-            )
-            evaluation = self._evaluate(model, eval_loader, criterion)
-            record = EpochRecord(
-                epoch=epoch,
-                train_loss=train_loss,
-                val_loss=evaluation["loss"],
-                val_accuracy=evaluation["accuracy"],
-                val_balanced_accuracy=evaluation["balanced_accuracy"],
-                val_macro_f1=evaluation["macro_f1"],
-                learning_rate=float(optimizer.param_groups[0]["lr"]),
-            )
-            history.append(record)
+        objective = self.selection.objective
+        with progress.task(
+            label, total=max_epochs, unit="epoch", bar_description=f"    {bar_label}"
+        ) as epochs:
+            for epoch in range(1, max_epochs + 1):
+                train_dataset.set_epoch(epoch)
+                train_loss = self._train_one_epoch(
+                    model, train_loader, criterion, optimizer, grad_clip=training.grad_clip_norm
+                )
+                evaluation = self._evaluate(model, eval_loader, criterion)
+                record = EpochRecord(
+                    epoch=epoch,
+                    train_loss=train_loss,
+                    val_loss=evaluation["loss"],
+                    val_accuracy=evaluation["accuracy"],
+                    val_balanced_accuracy=evaluation["balanced_accuracy"],
+                    val_macro_f1=evaluation["macro_f1"],
+                    learning_rate=float(optimizer.param_groups[0]["lr"]),
+                )
+                history.append(record)
 
-            value = record.objective_value(self.selection.objective)
-            if value > best_value:
-                best_value = value
-                stale = 0
-                if capture_best:
-                    # Deep copy: a shallow state_dict() copy shares tensor storage with the
-                    # live model and would keep changing as training continues.
-                    best_state = copy.deepcopy(
-                        {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                value = record.objective_value(objective)
+                epochs.update(
+                    1,
+                    **{
+                        "loss": round(train_loss, 4),
+                        f"{eval_name}_loss": round(float(evaluation["loss"]), 4),
+                        f"{eval_name}_{objective}": round(float(value), 4),
+                        "best": round(float(max(best_value, value)), 4),
+                    },
+                )
+                logger.debug(
+                    "%s epoch %d/%d: train_loss=%.4f %s_loss=%.4f %s_%s=%.4f",
+                    label,
+                    epoch,
+                    max_epochs,
+                    train_loss,
+                    eval_name,
+                    evaluation["loss"],
+                    eval_name,
+                    objective,
+                    value,
+                    extra={
+                        "epoch": epoch,
+                        "max_epochs": max_epochs,
+                        "train_loss": train_loss,
+                        "eval_scope": eval_name,
+                        "eval_loss": float(evaluation["loss"]),
+                        "objective": objective,
+                        "objective_value": float(value),
+                    },
+                )
+
+                if value > best_value:
+                    best_value = value
+                    stale = 0
+                    if capture_best:
+                        # Deep copy: a shallow state_dict() copy shares tensor storage with
+                        # the live model and would keep changing as training continues.
+                        best_state = copy.deepcopy(
+                            {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                        )
+                else:
+                    stale += 1
+                if (
+                    not disable_early_stopping
+                    and epoch >= self.selection.min_epochs
+                    and stale >= self.selection.patience
+                ):
+                    logger.debug(
+                        "early stop at epoch %d (patience %d)", epoch, self.selection.patience
                     )
-            else:
-                stale += 1
-            if (
-                not disable_early_stopping
-                and epoch >= self.selection.min_epochs
-                and stale >= self.selection.patience
-            ):
-                logger.debug("early stop at epoch %d (patience %d)", epoch, self.selection.patience)
-                break
+                    break
         return history, best_state, model
 
     # ------------------------------------------------------------ hyperparameters ---
@@ -411,66 +465,168 @@ class NestedLOSOTrainer:
         keys = sorted(space)
         return [dict(zip(keys, values)) for values in itertools.product(*(space[k] for k in keys))]
 
-    def _run_inner_search(self, fold: OuterFold, seed: int) -> tuple[TrialResult, list[dict]]:
+    def _run_inner_search(
+        self, fold: OuterFold, seed: int, *, label: str = ""
+    ) -> tuple[TrialResult, list[dict]]:
         """Score every hyperparameter trial on every inner fold of this outer fold."""
+        grid = self._trial_grid()
+        n_inner = fold.n_inner_folds
+        objective = self.selection.objective
+        logger.info(
+            "%sinner search: %d trial(s) x %d inner fold(s) = %d model fit(s), "
+            "up to %d epochs each",
+            f"{label} " if label else "",
+            len(grid),
+            n_inner,
+            len(grid) * n_inner,
+            self.selection.max_epochs,
+            extra={"n_trials": len(grid), "n_inner_folds": n_inner},
+        )
+
         trials: list[TrialResult] = []
-        for trial_index, overrides in enumerate(self._trial_grid()):
-            trial_id = f"trial{trial_index:02d}"
-            training = self.config.training.replace(**overrides)
-            result = TrialResult(trial_id=trial_id, hyperparameters=dict(overrides))
-            try:
-                for inner in fold.inner_folds:
-                    normalizer = self._fit_normalizer(inner.train_sample_ids, inner.train_subjects)
-                    normalizer.assert_not_fitted_on([fold.test_subject, inner.val_subject])
-                    train_dataset, val_dataset = self._make_datasets(
-                        inner.train_sample_ids,
-                        inner.val_sample_ids,
-                        eval_stage="val",
-                        normalizer=normalizer,
-                        seed=seed,
-                        augment=True,
-                    )
-                    if len(train_dataset) == 0 or len(val_dataset) == 0:
-                        raise ValueError(
-                            f"inner fold {inner.fold_index} (val={inner.val_subject}) has "
-                            f"{len(train_dataset)} train / {len(val_dataset)} val examples "
-                            f"for task {self.task.task_id}"
+        with progress.task(
+            f"{label} inner search".strip(),
+            total=len(grid) * n_inner,
+            unit="fit",
+            bar_description="  inner search",
+        ) as search:
+            for trial_index, overrides in enumerate(grid):
+                trial_id = f"trial{trial_index:02d}"
+                settings = _describe_hyperparameters(overrides)
+                training = self.config.training.replace(**overrides)
+                result = TrialResult(trial_id=trial_id, hyperparameters=dict(overrides))
+                trial_started = time.perf_counter()
+                try:
+                    for inner in fold.inner_folds:
+                        fit_label = (
+                            f"{label} {trial_id} inner {inner.fold_index + 1}/{n_inner} "
+                            f"val={inner.val_subject}"
+                        ).strip()
+                        search.set_description(
+                            fit_label,
+                            bar_description=(
+                                f"  inner search {trial_id} fold {inner.fold_index + 1}/{n_inner} "
+                                f"val={inner.val_subject}"
+                            ),
                         )
-                    history, _, _ = self._train_loop(
-                        train_dataset,
-                        val_dataset,
-                        training,
-                        seed=seed,
-                        max_epochs=self.selection.max_epochs,
-                        capture_best=False,
+                        fit_started = time.perf_counter()
+
+                        normalizer = self._fit_normalizer(
+                            inner.train_sample_ids, inner.train_subjects
+                        )
+                        normalizer.assert_not_fitted_on([fold.test_subject, inner.val_subject])
+                        train_dataset, val_dataset = self._make_datasets(
+                            inner.train_sample_ids,
+                            inner.val_sample_ids,
+                            eval_stage="val",
+                            normalizer=normalizer,
+                            seed=seed,
+                            augment=True,
+                        )
+                        if len(train_dataset) == 0 or len(val_dataset) == 0:
+                            raise ValueError(
+                                f"inner fold {inner.fold_index} (val={inner.val_subject}) has "
+                                f"{len(train_dataset)} train / {len(val_dataset)} val examples "
+                                f"for task {self.task.task_id}"
+                            )
+                        history, _, _ = self._train_loop(
+                            train_dataset,
+                            val_dataset,
+                            training,
+                            seed=seed,
+                            max_epochs=self.selection.max_epochs,
+                            capture_best=False,
+                            label=f"{fit_label} epochs",
+                            bar_label="epochs",
+                            eval_name="val",
+                        )
+                        selected = select_best_epoch(history, self.selection)
+                        result.inner_selections.append(selected)
+                        result.inner_fold_subjects.append(inner.val_subject)
+                        search.update(1)
+                        logger.info(
+                            "%s [%s]: best val_%s=%.4f at epoch %d of %d run in %s",
+                            fit_label,
+                            settings,
+                            objective,
+                            selected.best_value,
+                            selected.best_epoch,
+                            len(history),
+                            progress.format_duration(time.perf_counter() - fit_started),
+                            extra={
+                                "trial_id": trial_id,
+                                "val_subject": inner.val_subject,
+                                "best_epoch": selected.best_epoch,
+                                "best_value": selected.best_value,
+                                "n_epochs_run": len(history),
+                            },
+                        )
+                except Exception as exc:  # noqa: BLE001 - failure is recorded, never hidden
+                    result.failed = True
+                    result.failure_reason = f"{type(exc).__name__}: {exc}"
+                    logger.warning(
+                        "trial %s failed on outer fold %s: %s", trial_id, fold.test_subject, exc
                     )
-                    result.inner_selections.append(select_best_epoch(history, self.selection))
-                    result.inner_fold_subjects.append(inner.val_subject)
-            except Exception as exc:  # noqa: BLE001 - failure is recorded, never hidden
-                result.failed = True
-                result.failure_reason = f"{type(exc).__name__}: {exc}"
-                logger.warning(
-                    "trial %s failed on outer fold %s: %s", trial_id, fold.test_subject, exc
-                )
-            trials.append(result)
+                    # Keep the bar truthful: charge the fits this trial will never run.
+                    search.update(n_inner - len(result.inner_selections))
+                trials.append(result)
+                if not result.failed:
+                    logger.info(
+                        "%s%s [%s] done: mean val_%s=%.4f +/- %.4f over %d inner fold(s) in %s",
+                        f"{label} " if label else "",
+                        trial_id,
+                        settings,
+                        objective,
+                        result.mean_objective,
+                        result.std_objective,
+                        len(result.inner_selections),
+                        progress.format_duration(time.perf_counter() - trial_started),
+                        extra={
+                            "trial_id": trial_id,
+                            "mean_objective": result.mean_objective,
+                            "std_objective": result.std_objective,
+                        },
+                    )
+
         best = select_best_trial(trials)
+        logger.info(
+            "%sselected %s [%s] with mean val_%s=%.4f",
+            f"{label} " if label else "",
+            best.trial_id,
+            _describe_hyperparameters(best.hyperparameters),
+            objective,
+            best.mean_objective,
+        )
         return best, [trial.to_dict() for trial in trials]
 
     # --------------------------------------------------------------------- folds ---
 
-    def run_fold(self, fold: OuterFold, seed: int) -> tuple[FoldOutcome, pd.DataFrame]:
-        """Execute the full protocol for one outer fold and one seed."""
+    def run_fold(
+        self, fold: OuterFold, seed: int, *, progress_label: str = ""
+    ) -> tuple[FoldOutcome, pd.DataFrame]:
+        """Execute the full protocol for one outer fold and one seed.
+
+        ``progress_label`` prefixes this fold's progress and log lines with its position in
+        the wider run (``fold 3/15``); it is display only.
+        """
         started = time.perf_counter()
+        label = f"{progress_label} {fold.test_subject} seed{seed}".strip()
         logger.info(
-            "outer fold %d: held-out participant %s (train=%s), seed %d",
+            "%s: outer fold %d, held-out participant %s (train=%s), seed %d, "
+            "task=%s model=%s modality=%s device=%s",
+            label,
             fold.fold_index,
             fold.test_subject,
             ",".join(fold.train_subjects),
             seed,
-            extra={"outer_fold": fold.fold_index, "test_subject": fold.test_subject},
+            self.task.task_id,
+            self.model_id,
+            self.modality,
+            self.device.type,
+            extra={"outer_fold": fold.fold_index, "test_subject": fold.test_subject, "seed": seed},
         )
 
-        best_trial, all_trials = self._run_inner_search(fold, seed)
+        best_trial, all_trials = self._run_inner_search(fold, seed, label=label)
         epoch_budget = select_epoch_budget(best_trial.inner_selections, self.selection)
         training = self.config.training.replace(**best_trial.hyperparameters)
 
@@ -498,6 +654,15 @@ class NestedLOSOTrainer:
         # numbers recorded here are measured on the TRAINING data, so they are a fit
         # diagnostic, not validation, and are labelled `history_scope` accordingly. The
         # held-out participant is not touched until the single evaluation below.
+        refit_started = time.perf_counter()
+        logger.info(
+            "%s: refitting on %d windows from %d participant(s) for exactly %d epoch(s)",
+            label,
+            len(train_dataset),
+            len(fold.train_subjects),
+            epoch_budget,
+            extra={"epoch_budget": epoch_budget, "n_train": len(train_dataset)},
+        )
         history, _, model = self._train_loop(
             train_dataset,
             train_dataset,
@@ -506,6 +671,15 @@ class NestedLOSOTrainer:
             max_epochs=epoch_budget,
             capture_best=False,
             disable_early_stopping=True,
+            label=f"{label} refit epochs".strip(),
+            bar_label="refit epochs",
+            eval_name="fit",
+        )
+        logger.info(
+            "%s: refit done in %s (final train loss %.4f)",
+            label,
+            progress.format_duration(time.perf_counter() - refit_started),
+            history[-1].train_loss,
         )
 
         class_weights = compute_class_weights(
@@ -555,6 +729,24 @@ class NestedLOSOTrainer:
         evaluation = self._evaluate(model, test_loader, criterion)
         ledger = self._build_ledger_rows(
             test_dataset, evaluation, fold=fold, seed=seed, checkpoint_sha=checkpoint_sha
+        )
+        logger.info(
+            "%s: held-out %s scored accuracy=%.3f balanced_accuracy=%.3f macro_f1=%.3f "
+            "on %d window(s); fold took %s",
+            label,
+            fold.test_subject,
+            evaluation["accuracy"],
+            evaluation["balanced_accuracy"],
+            evaluation["macro_f1"],
+            len(test_dataset),
+            progress.format_duration(time.perf_counter() - started),
+            extra={
+                "test_subject": fold.test_subject,
+                "test_accuracy": evaluation["accuracy"],
+                "test_balanced_accuracy": evaluation["balanced_accuracy"],
+                "test_macro_f1": evaluation["macro_f1"],
+                "n_test": len(test_dataset),
+            },
         )
 
         outcome = FoldOutcome(
