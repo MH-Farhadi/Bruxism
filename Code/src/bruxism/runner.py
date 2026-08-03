@@ -134,6 +134,7 @@ def run_experiment(
     resume: bool = True,
     dry_run: bool = False,
     max_folds: int | None = None,
+    figures: bool = True,
 ) -> RunBundle:
     """Execute an experiment and write its run bundle.
 
@@ -147,6 +148,11 @@ def run_experiment(
         ``--validate-only`` to check a config against real data cheaply.
     max_folds
         Cap the number of (condition, seed, fold) triples executed. Used by the smoke run.
+    figures
+        Write the run's figure set into ``<run_dir>/figures`` once the last fold is done.
+        On by default: a finished run should explain itself. Figure generation is
+        deliberately not part of the configuration hash -- it produces no number a result
+        depends on -- so turning it off cannot change what a run computes.
 
     Returns
     -------
@@ -348,6 +354,19 @@ def run_experiment(
     metrics = summarise_ledger(predictions)
     write_json(bundle.metrics_path, metrics)
     write_csv(run_dir / "metrics.csv", _metrics_to_frame(metrics))
+
+    if figures:
+        _write_figures(
+            bundle,
+            config=config,
+            manifest=manifest,
+            window_index=window_index,
+            cache=cache,
+            predictions=predictions,
+            metrics=metrics,
+            outcomes=outcomes,
+        )
+
     logger.info(
         "run %s complete in %s: %d folds, %d predictions -> %s",
         run_id,
@@ -357,6 +376,57 @@ def run_experiment(
         run_dir,
     )
     return bundle
+
+
+def _write_figures(
+    bundle: RunBundle,
+    *,
+    config: ExperimentConfig,
+    manifest: DatasetManifest,
+    window_index: WindowIndex,
+    cache: RecordingCache,
+    predictions: pd.DataFrame,
+    metrics: dict[str, Any],
+    outcomes: Sequence[dict[str, Any]],
+) -> None:
+    """Draw the run's figures, reusing the data already loaded for training.
+
+    Never raises: the folds, ledger and metrics are already written and durable by this
+    point, so a plotting failure must not turn a completed run into a failed command. The
+    reason for any missing figure is recorded in ``figures/figure_index.json``.
+    """
+    from bruxism.visualization.run_figures import generate_run_figures
+
+    started = time.perf_counter()
+    try:
+        summary = generate_run_figures(
+            bundle.run_dir,
+            config=config,
+            manifest=manifest,
+            window_index=window_index,
+            cache=cache,
+            predictions=predictions,
+            metrics=metrics,
+            fold_outcomes=list(outcomes),
+        )
+    except Exception as exc:  # noqa: BLE001 - a finished run must not fail on a figure
+        logger.warning(
+            "figure generation failed (%s: %s); the run bundle itself is complete and "
+            "`bruxism-figures --run-dir %s` can retry it",
+            type(exc).__name__,
+            exc,
+            bundle.run_dir,
+            exc_info=True,
+        )
+        return
+    logger.info(
+        "figures written in %s: %d figure(s) in %s (%d skipped, %d failed)",
+        progress.format_duration(time.perf_counter() - started),
+        summary["written"],
+        summary["figures_dir"],
+        summary["skipped"],
+        summary["failed"],
+    )
 
 
 def _remaining_estimate(trained_seconds: Sequence[float], folds_left: int) -> str:

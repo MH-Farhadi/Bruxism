@@ -64,6 +64,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--no-figures",
+        action="store_true",
+        help=(
+            "Skip the figure set written into <run_dir>/figures when the run finishes. "
+            "Figures are display artifacts only: they change no recorded number and are "
+            "not part of the configuration hash."
+        ),
+    )
+    parser.add_argument(
         "--seeds",
         type=int,
         nargs="+",
@@ -98,6 +107,7 @@ def main_impl(args: argparse.Namespace) -> int:
         resume=not args.no_resume,
         dry_run=args.validate_only,
         max_folds=args.max_folds,
+        figures=not args.no_figures,
     )
     print(f"run id        : {bundle.run_id}")
     print(f"run directory : {bundle.run_dir}")

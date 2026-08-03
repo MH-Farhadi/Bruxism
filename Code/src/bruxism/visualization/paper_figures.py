@@ -32,6 +32,7 @@ from bruxism.utils.logging import get_logger  # noqa: E402
 
 __all__ = [
     "FigureStyle",
+    "caveat",
     "plot_confusion_matrices",
     "plot_flow_diagram",
     "plot_modality_comparison",
@@ -103,7 +104,7 @@ def save_figure(fig: plt.Figure, output_dir: Path, stem: str) -> list[Path]:
     return written
 
 
-def _caveat(fig: plt.Figure, text: str) -> None:
+def caveat(fig: plt.Figure, text: str) -> None:
     """Stamp a scope caveat below a figure so it survives being copied into a slide deck.
 
     The text is positioned below the lowest drawn element (rotated tick labels included)
@@ -177,7 +178,7 @@ def plot_confusion_matrices(
                 )
     fig.colorbar(image, ax=axes, fraction=0.025, pad=0.02, label="Row-normalised rate")
     fig.suptitle("Held-out confusion matrices (pooled across leave-one-subject-out folds)", y=0.99)
-    _caveat(
+    caveat(
         fig,
         "Pooled windows are descriptive only: windows within a participant and recording "
         "are correlated. Participant-level results are the primary evidence.",
@@ -215,7 +216,7 @@ def plot_roc_curves(
     ax.legend(loc="lower right", fontsize=7)
     if plotted == 0:
         ax.text(0.5, 0.5, "no class had both positive and negative examples", ha="center")
-    _caveat(fig, "Curves are pooled over held-out windows and are descriptive.")
+    caveat(fig, "Curves are pooled over held-out windows and are descriptive.")
     return save_figure(fig, output_dir, stem)
 
 
@@ -241,7 +242,7 @@ def plot_pr_curves(
     ax.set_ylim(-0.01, 1.01)
     ax.set_title(title or "One-vs-rest precision-recall, held-out participants")
     ax.legend(loc="lower left", fontsize=7)
-    _caveat(
+    caveat(
         fig,
         "Precision-recall is the more informative view under this class imbalance; the "
         "no-skill baseline differs per class and equals that class's prevalence.",
@@ -311,7 +312,7 @@ def plot_per_participant(
     ax.set_ylabel(metric.replace("_", " "))
     ax.set_xlabel("Held-out participant")
     ax.set_title(f"Per-participant {metric.replace('_', ' ')} (leave-one-subject-out)")
-    _caveat(
+    caveat(
         fig,
         "Each bar is the participant's own held-out fold. Five participants cannot "
         "characterise population variability; no generalisation claim follows from the mean.",
@@ -364,7 +365,7 @@ def plot_training_curves(
     if drawn:
         axes[0].legend(fontsize=7)
     scope = {outcome.get("history_scope", "unknown") for outcome in fold_outcomes}
-    _caveat(
+    caveat(
         fig,
         "The outer held-out participant contributes to no curve here. Refit histories "
         f"(scope: {', '.join(sorted(scope))}) are measured on training data and are fit "
@@ -412,7 +413,7 @@ def plot_modality_comparison(
     ax.set_ylim(0, 1.12)
     ax.set_title("Modality comparison (participant-level mean)")
     ax.legend(title="modality", fontsize=8)
-    _caveat(
+    caveat(
         fig,
         "All conditions share identical windows, folds, seeds and selection budget; only "
         "the modality differs. Compare the five-class and no-chewing groups to see whether "
@@ -491,7 +492,7 @@ def plot_tsne(
     ax.set_title("EXPLORATORY: held-out embeddings, t-SNE projection")
     ax.legend(fontsize=7, markerscale=2)
     ax.grid(alpha=0.15)
-    _caveat(
+    caveat(
         fig,
         f"Exploratory only. perplexity={effective_perplexity:g}, init=pca, seed={seed}, "
         f"checkpoint={checkpoint_id or 'unspecified'}. Cluster appearance is not validation.",
@@ -539,7 +540,7 @@ def plot_flow_diagram(
     ax.set_xlabel("Participant")
     ax.set_title("Analysable windows per participant and task family")
     ax.legend(fontsize=8, ncols=2)
-    _caveat(
+    caveat(
         fig,
         "Counts follow the approved segmentation policy: windows lie wholly inside a "
         "trigger-active interval, clear of the transition and startup guards.",

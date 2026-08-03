@@ -26,8 +26,15 @@ outputs/runs/<run_id>/
 ├── checkpoints/             weights + architecture + normalizer + class weights
 ├── predictions.parquet      the prediction ledger
 ├── metrics.json / .csv      recomputed from the ledger
-└── figures/
+└── figures/                 the run's own figure set (PNG + PDF), README.md and
+                             figure_index.json naming every figure and every skip reason
 ```
+
+`figures/` is written after the last fold, from the artifacts above plus the raw recordings
+and this run's own checkpoints. It is a **display** artifact: it enters no hash, no metric
+and no claim, so `--no-figures` (or a failure while drawing) changes nothing a result depends
+on. `bruxism-figures --run-dir outputs/runs/<run_id> --data-root ...` regenerates it from the
+bundle without retraining, which is also how a run that predates a figure acquires it.
 
 Three hashes identify a run:
 

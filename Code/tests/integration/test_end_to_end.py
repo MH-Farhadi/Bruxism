@@ -106,7 +106,15 @@ def test_full_nested_loso_smoke_run(synthetic_root, tmp_path):
     config_path = _write_config(tmp_path, synthetic_root)
     assert (
         run_nested_loso.main(
-            ["--config", str(config_path), "--data-root", str(synthetic_root), "--max-folds", "2"]
+            [
+                "--config",
+                str(config_path),
+                "--data-root",
+                str(synthetic_root),
+                "--max-folds",
+                "2",
+                "--no-figures",
+            ]
         )
         == 0
     )
@@ -155,7 +163,15 @@ def test_full_nested_loso_smoke_run(synthetic_root, tmp_path):
 
 def test_resume_reuses_completed_folds(synthetic_root, tmp_path):
     config_path = _write_config(tmp_path, synthetic_root)
-    args = ["--config", str(config_path), "--data-root", str(synthetic_root), "--max-folds", "1"]
+    args = [
+        "--config",
+        str(config_path),
+        "--data-root",
+        str(synthetic_root),
+        "--max-folds",
+        "1",
+        "--no-figures",
+    ]
     assert run_nested_loso.main(args) == 0
     first = (tmp_path / "runs" / "itest" / "predictions.parquet").read_bytes()
     assert run_nested_loso.main(args) == 0
@@ -187,7 +203,14 @@ def test_validate_only_writes_a_plan_without_training(synthetic_root, tmp_path):
     config_path = _write_config(tmp_path, synthetic_root)
     assert (
         run_nested_loso.main(
-            ["--config", str(config_path), "--data-root", str(synthetic_root), "--validate-only"]
+            [
+                "--config",
+                str(config_path),
+                "--data-root",
+                str(synthetic_root),
+                "--validate-only",
+                "--no-figures",
+            ]
         )
         == 0
     )
@@ -209,7 +232,11 @@ def _log_loggers(run_dir: Path) -> set[str]:
 
 
 def _one_fast_fold(config_path: Path, root: Path, *extra: str) -> list[str]:
-    """CLI arguments for the cheapest run that still exercises every training stage."""
+    """CLI arguments for the cheapest run that still exercises every training stage.
+
+    Figures are switched off: they are covered by ``test_run_figures.py`` and drawing them
+    would add seconds to every test here that is about the run bundle instead.
+    """
     return [
         "--config",
         str(config_path),
@@ -218,6 +245,7 @@ def _one_fast_fold(config_path: Path, root: Path, *extra: str) -> list[str]:
         "--max-folds",
         "1",
         "--no-resume",
+        "--no-figures",
         "--set",
         "selection.max_epochs=1",
         *extra,

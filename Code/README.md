@@ -45,8 +45,8 @@ python -m pip install -e ".[dev,video]"
 # 2. Quality gates -- no private data needed, everything runs on synthetic fixtures
 python -m ruff check src scripts tests
 python -m mypy
-python -m pytest -m "not slow"          # fast unit tests
-python -m pytest                         # + end-to-end integration (196 tests, ~5 min)
+python -m pytest -m "not slow"          # fast unit tests (~30 s)
+python -m pytest                         # + end-to-end integration (236 tests, ~10 min)
 
 # 3. Point the software at an authorized data root (never copied into this repo)
 export BRUXISM_DATA_ROOT=../Data         # or pass --data-root everywhere
@@ -54,8 +54,9 @@ export BRUXISM_DATA_ROOT=../Data         # or pass --data-root everywhere
 # 4. Audit the raw data (read-only)
 bruxism-audit --data-root "$BRUXISM_DATA_ROOT" --output-root outputs/data_audit
 
-# 5. Fast one-fold smoke run (~35 s on a laptop GPU)
+# 5. Fast one-fold smoke run (~35 s of training, then ~20 s of figures)
 bruxism-train --config configs/experiments/smoke.yaml --max-folds 1
+open outputs/runs/smoke/figures/README.md     # 24 figures explaining that run
 
 # 6. Regenerate every figure and table
 bruxism-benchmark --output outputs/benchmarks
@@ -94,9 +95,13 @@ Console scripts are installed by `pip install -e .`. Each is equivalently
 | Check a config without training | add `--validate-only` | seconds |
 | Cap the work | add `--max-folds N` | — |
 | Change a setting without editing YAML | add `--set training.batch_size=32` | — |
+| Skip the figures a finished run draws | add `--no-figures` | saves ~20 s–2 min |
 
 Runs are **resumable**: rerunning the same command reuses completed folds, and refuses to
 resume across a changed configuration, manifest or window index.
+
+Every finished run also writes its own figure set — see
+[**What a finished run draws**](#what-a-finished-run-draws) below.
 
 ### Watching a run
 
@@ -134,11 +139,96 @@ DEBUG, one JSON object per line.
 |---|---|
 | Recompute all metrics from saved predictions | `bruxism-summarize --runs-root outputs/runs --output outputs/summary` |
 | Measure parameter counts and the three latencies | `bruxism-benchmark --output outputs/benchmarks` |
+| **Rebuild one run's figures** without retraining | `bruxism-figures --run-dir outputs/runs/<run_id> --data-root ../Data` |
 | **Regenerate every figure, table, LaTeX macro and the results narrative** | `bruxism-report --runs-root outputs/runs --output-root outputs/paper_bundle --data-root ../Data` |
 
 ---
 
-## Regenerating figures later
+## What a finished run draws
+
+When the last fold completes, the run writes **24 figures** into
+`outputs/runs/<run_id>/figures/` — every one as **PNG (300 dpi)** for drafts and **PDF**
+(vector) for submission — plus a `README.md` naming what each shows and which manuscript slot
+it can fill, and a machine-readable `figure_index.json`. The folder is meant to be
+self-contained: opening it should be enough to understand what the run consumed, how the data
+became examples, how the model was selected, how it scored on held-out participants and where
+it failed.
+
+Nothing here can fail a run. Each figure is attempted independently; a failure is logged and
+recorded in the index with its reason, and the rest are still produced.
+
+| # | Figure | What it shows |
+|---|---|---|
+| 00 | `run_scorecard` | Identity, provenance, protocol and headline participant-level results on one page |
+| 01 | `dataset_inventory` | Analysable windows per participant and class, and the class balance |
+| 02 | `window_inventory` | Participant × class counts and row shares — which folds are thin |
+| 03 | `segmentation_timeline` | Trigger runs, transition guards, startup guard and the emitted overlapping windows, on a real recording |
+| 04 | `filter_response` | Every filter stage and the chain as applied, including the forward+reverse zero-phase pass |
+| 05 | `preprocessing_stages` | Raw → notch → bandpass on a real excerpt, with the spectrum at each stage |
+| 06 | `class_spectra` | Mean EMG and microphone spectra per class |
+| 07 | `example_windows` | A representative 1 s model input per class over a percentile band |
+| 08 | `wavelet_bands` | The named coefficient bands each branch consumes, per class |
+| 09 | `wavelet_band_energy` | Share of window energy per band and class, marking the bands the network receives |
+| 10 | `augmentation_examples` | What the training augmenter actually does to a minority-class window |
+| 11 | `training_curves` | Per-epoch refit loss and objective, one column per seed |
+| 12 | `hyperparameter_selection` | What the inner search scored, what it selected, and the epoch budget |
+| 13–16 | `confusion_matrix`, `roc_curves`, `pr_curves`, `per_participant` | Held-out performance |
+| 17 | `per_class_performance` | Precision / recall / F1 / AUC / average precision per class |
+| 18 | `participant_class_recall` | Recall in every (participant, class) cell — who failed, on what |
+| 19 | `calibration` | Reliability diagram and expected calibration error |
+| 20 | `seed_stability` | How much each result moves when only the seed changes |
+| 21 | `error_timeline` | Held-out predictions in recording time — do errors cluster at onsets? |
+| 22 | `embedding_tsne` | One t-SNE projection coloured twice: by class, **and by participant** |
+| 23 | `modality_comparison` | Fusion vs EMG-only vs audio-only (ablation runs only) |
+
+Figures 01–10 and 22 need the raw data root; without it they are skipped with a recorded
+reason and the ledger-derived figures are still produced. Figures 20 and 23 are skipped for a
+single-seed or single-modality run, which is why a typical five-class run reports 23 written
+and 1 skipped.
+
+**Customising what a run draws.** The trainer takes `--no-figures`; everything else is a knob
+on `bruxism-figures`, which rebuilds the same set from a finished run bundle without
+retraining a thing:
+
+```bash
+# rebuild one run's figures (also the way to add figures to a run trained before they existed)
+bruxism-figures --run-dir outputs/runs/<run_id> --data-root ../Data
+
+# several runs at once
+bruxism-figures --run-dir outputs/runs/<a> --run-dir outputs/runs/<b> --data-root ../Data
+
+# cheaper / faster variants
+bruxism-figures --run-dir outputs/runs/<id> --no-tsne             # skip the projection
+bruxism-figures --run-dir outputs/runs/<id> --no-signal-figures   # ledger-derived only
+bruxism-figures --run-dir outputs/runs/<id> --data-root ../Data \
+                --max-windows-per-class 400 --tsne-max-samples 6000 --tsne-seed 1
+```
+
+| Knob | Effect | Default |
+|---|---|---|
+| `--max-windows-per-class` | Windows sampled for the spectral and wavelet figures | 150 |
+| `--tsne-max-samples` | Held-out embeddings entering the projection | 3000 |
+| `--tsne-seed` | Fixed seed for the projection | 0 |
+| `--no-signal-figures` | Skip everything that reads raw recordings | off |
+| `--no-tsne` | Skip the embedding projection | off |
+
+Sampling is deterministic (evenly spaced, no RNG), so regenerating a figure from the same run
+bundle reproduces it.
+
+Figure generation is deliberately **not part of the configuration hash**: it produces no
+number a result depends on, so turning it on or off cannot change what a run computes, and
+adding it to an existing project does not invalidate a resumable run.
+
+The manuscript bundle (`bruxism-report`) is a different artifact with a different job: it
+pools *across* runs to build the paper's tables, LaTeX macros and narrative. Use the run
+folder to understand one run; use the bundle to write the paper.
+
+---
+
+## Regenerating the manuscript bundle
+
+For one run's own figures see [What a finished run draws](#what-a-finished-run-draws) above;
+this section is about the cross-run bundle the manuscript is written from.
 
 `bruxism-report` rebuilds the **entire** manuscript bundle from saved artifacts. It never
 re-runs a model and never re-reads raw data (except for the t-SNE, which must recompute
@@ -206,7 +296,7 @@ Code/
 │   ├── models/                    dual_branch, dwt, ablations, baselines
 │   ├── training/                  engine, losses, selection
 │   ├── evaluation/                metrics, aggregation, benchmark
-│   ├── visualization/             paper_figures
+│   ├── visualization/             paper_figures, signal_figures, diagnostics, run_figures
 │   ├── utils/                     reproducibility, io, logging
 │   └── cli/                       one module per console script
 ├── scripts/{data,train,evaluate}/ thin entry points
