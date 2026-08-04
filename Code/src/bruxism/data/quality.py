@@ -25,7 +25,8 @@ __all__ = [
 ]
 
 #: Increment whenever a flag definition, threshold or resolution rule changes.
-QUALITY_POLICY_VERSION: Final[str] = "2026-07-27.1"
+#: 2026-08-03.1 adds MAINS_CONTAMINATION.
+QUALITY_POLICY_VERSION: Final[str] = "2026-08-03.1"
 
 
 class QualityFlag(StrEnum):
@@ -59,6 +60,8 @@ class QualityFlag(StrEnum):
     UNEXPECTED_TRIGGER_IN_REST = "unexpected_trigger_in_rest"
     #: Metadata ``status`` is not ``COMPLETED``.
     NOT_COMPLETED = "not_completed"
+    #: Most of the raw in-band EMG power sits at multiples of the mains frequency.
+    MAINS_CONTAMINATION = "mains_contamination"
 
 
 _FLAG_DESCRIPTIONS: Final[dict[QualityFlag, str]] = {
@@ -116,6 +119,17 @@ _FLAG_DESCRIPTIONS: Final[dict[QualityFlag, str]] = {
     ),
     QualityFlag.NOT_COMPLETED: (
         "Metadata 'status' is not COMPLETED. Excluded: the acquisition run did not finish."
+    ),
+    QualityFlag.MAINS_CONTAMINATION: (
+        "More than 30 % of the raw 20-450 Hz EMG power sits within 3 Hz of a multiple of "
+        "the mains frequency: the channel is measuring electrode impedance and cable "
+        "routing more than muscle. RETAINED, NOT EXCLUDED. It is a flag for a human, not "
+        "an exclusion rule -- dropping the affected participant automatically would have "
+        "hidden the finding that the production filter chain notched 60 Hz, which the "
+        "hardware had already removed, and passed 180/300/420 Hz untouched (cause.md). "
+        "The corrected chain notches every harmonic; this flag describes the raw signal "
+        "and stays raised afterwards, because what it records is a property of the "
+        "acquisition, not of the analysis."
     ),
 }
 

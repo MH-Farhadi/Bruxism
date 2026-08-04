@@ -35,6 +35,7 @@ from bruxism.cli._common import (
     parse_and_run,
     resolve_data_root,
 )
+from bruxism.data.dataset import RecordingCache
 from bruxism.data.manifest import build_manifest
 from bruxism.data.quality import CONFLICT_RESOLUTIONS, QualityFlag, describe_flag
 from bruxism.data.schema import (
@@ -44,6 +45,12 @@ from bruxism.data.schema import (
     SIGNAL_UNITS,
 )
 from bruxism.data.segments import SegmentationConfig, SegmentationPolicy, build_window_index
+from bruxism.evaluation.segmentation import trigger_onset_alignment, window_guard_sweep
+from bruxism.preprocessing.filters import FilterChainConfig
+from bruxism.preprocessing.interference import (
+    MAINS_CONTAMINATION_THRESHOLD,
+    MAINS_HALF_WIDTH_HZ,
+)
 from bruxism.reporting import render_audit_markdown
 from bruxism.utils.io import write_csv, write_json, write_parquet
 from bruxism.utils.logging import get_logger
@@ -79,6 +86,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-figures", action="store_true", help="Skip the quality figures.")
     parser.add_argument(
+        "--no-onset-alignment",
+        action="store_true",
+        help="Skip the trigger-onset alignment measurement (it filters every recording).",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=Path("outputs/cache"),
+        help="Filtered-recording cache used by the onset-alignment measurement.",
+    )
+    parser.add_argument(
         "--validate-only",
         action="store_true",
         help="Scan and report to the console; write nothing.",
@@ -110,6 +128,53 @@ def _guard_sensitivity(manifest: Any) -> pd.DataFrame:
             row[f"n_{family}"] = int(pivot[family].sum())
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def _mains_contamination(frame: pd.DataFrame) -> dict[str, Any]:
+    """Per-recording mains contamination of the RAW signal, worst offenders first.
+
+    This is the measurement that was missing when the defect in ``cause.md`` went
+    undetected through three reproducible runs: nothing ever reported how much of the
+    signal was interference. It describes the acquisition, so the corrected filter chain
+    does not change it -- and must not, or the audit would stop being able to say that a
+    channel arrived contaminated.
+    """
+    ordered = frame.sort_values("mains_harmonic_power_fraction", ascending=False)
+    by_subject = (
+        frame.groupby("subject_id", observed=True)["mains_harmonic_power_fraction"]
+        .agg(["mean", "min", "max"])
+        .round(4)
+        .reset_index()
+    )
+    by_condition = (
+        frame.groupby("condition", observed=True)["mains_harmonic_power_fraction"]
+        .agg(["mean", "min", "max"])
+        .round(4)
+        .reset_index()
+    )
+    flagged = frame["quality_flags"].str.contains(QualityFlag.MAINS_CONTAMINATION.value, na=False)
+    return {
+        "threshold": MAINS_CONTAMINATION_THRESHOLD,
+        "half_width_hz": MAINS_HALF_WIDTH_HZ,
+        "band_hz": [20.0, 450.0],
+        "measured_on": "raw signal, before any offline filtering",
+        "n_flagged": int(flagged.sum()),
+        "n_recordings": int(len(frame)),
+        "median_fraction": float(frame["mains_harmonic_power_fraction"].median()),
+        "max_fraction": float(frame["mains_harmonic_power_fraction"].max()),
+        "by_subject": by_subject.to_dict("records"),
+        "by_condition": by_condition.to_dict("records"),
+        "worst_recordings": ordered.head(15)[
+            [
+                "recording_id",
+                "subject_id",
+                "condition",
+                "mains_harmonic_power_fraction",
+                "mains_harmonic_breakdown",
+            ]
+        ].to_dict("records"),
+        "policy": describe_flag(QualityFlag.MAINS_CONTAMINATION),
+    }
 
 
 def _trigger_summary(frame: pd.DataFrame) -> pd.DataFrame:
@@ -229,6 +294,14 @@ def main_impl(args: argparse.Namespace) -> int:
         manifest, SegmentationConfig(guard_seconds=0.25, startup_guard_seconds=0.5)
     )
     sensitivity = _guard_sensitivity(manifest)
+    sweep = window_guard_sweep(manifest)
+    onset_alignment: dict[str, Any] = {"skipped": "requires --data-root signal access"}
+    if not args.no_onset_alignment:
+        # The guard's job is to keep windows clear of a condition change. Measuring where
+        # the change actually happens is the only way to price the guard from data rather
+        # than from a round number. Uses the production filter chain.
+        cache = RecordingCache(manifest, FilterChainConfig(), cache_dir=args.cache_dir)
+        onset_alignment = trigger_onset_alignment(manifest, cache)
 
     audit: dict[str, Any] = {
         "manifest_hash": manifest.manifest_hash,
@@ -316,6 +389,9 @@ def main_impl(args: argparse.Namespace) -> int:
             },
         },
         "guard_sensitivity": sensitivity.to_dict("records"),
+        "window_guard_sweep": sweep.to_dict("records"),
+        "trigger_onset_alignment": onset_alignment,
+        "mains_contamination": _mains_contamination(frame),
         "historical_confusion_matrix_check": _historical_check(legacy_index),
     }
 
@@ -337,6 +413,20 @@ def main_impl(args: argparse.Namespace) -> int:
     write_csv(output_dir / "manifest.csv", frame)
     write_csv(output_dir / "trigger_summary.csv", _trigger_summary(frame))
     write_csv(output_dir / "guard_sensitivity.csv", sensitivity)
+    write_csv(output_dir / "window_guard_sweep.csv", sweep)
+    write_csv(
+        output_dir / "mains_contamination.csv",
+        frame[
+            [
+                "recording_id",
+                "subject_id",
+                "condition",
+                "mains_harmonic_power_fraction",
+                "mains_harmonic_power_fraction_per_channel",
+                "mains_harmonic_breakdown",
+            ]
+        ].sort_values("mains_harmonic_power_fraction", ascending=False),
+    )
     write_csv(
         output_dir / "window_counts.csv",
         approved_index.counts_by("subject_id", "task_family", "condition"),

@@ -46,6 +46,7 @@ from bruxism.utils.logging import get_logger  # noqa: E402
 from bruxism.visualization.paper_figures import FigureStyle, caveat, save_figure  # noqa: E402
 
 __all__ = [
+    "measured_raw_spectrum",
     "plot_augmentation_examples",
     "plot_class_spectra",
     "plot_dataset_inventory",
@@ -583,52 +584,142 @@ def plot_segmentation_timeline(
 # ----------------------------------------------------------------- filtering ---
 
 
+def measured_raw_spectrum(
+    manifest: DatasetManifest,
+    *,
+    max_recordings: int = 5,
+    nperseg: int = 8192,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str]] | None:
+    """Mean **raw** EMG and microphone spectra across a deterministic recording sample.
+
+    One recording per participant, chosen by sorted recording id, read straight from the
+    CSV with no filtering. Returns ``(frequencies, emg_db, mic_db, recording_ids)`` with
+    both spectra in dB and normalised so their 99.5th percentile sits at 0 dB, which is
+    what makes them overlayable on a filter-response axis. ``None`` when nothing readable
+    was found -- the caller falls back to drawing the response alone.
+    """
+    from scipy.signal import welch
+
+    from bruxism.data.schema import MIC_COLUMN, read_recording_csv
+
+    chosen: list[RecordingRecord] = []
+    for subject in manifest.subject_ids:
+        for record in sorted(manifest.included, key=lambda item: item.recording_id):
+            if record.subject_id == subject:
+                chosen.append(record)
+                break
+        if len(chosen) >= max_recordings:
+            break
+    if not chosen:
+        return None
+
+    rate = float(manifest.sampling_rate_hz)
+    emg_spectra: list[np.ndarray] = []
+    mic_spectra: list[np.ndarray] = []
+    frequencies = np.array([])
+    for record in chosen:
+        frame = read_recording_csv(manifest.csv_path(record))
+        emg = frame[list(EMG_COLUMNS)].to_numpy(dtype=np.float64)
+        mic = frame[MIC_COLUMN].to_numpy(dtype=np.float64)
+        segment = int(min(nperseg, emg.shape[0]))
+        frequencies, psd = welch(emg, fs=rate, nperseg=segment, axis=0)
+        # Normalise each recording before averaging: amplitudes differ ~4x between
+        # participants and an unnormalised mean would be one participant's spectrum.
+        emg_spectra.append(_normalise_spectrum(psd.mean(axis=1)))
+        _, mic_psd = welch(mic, fs=rate, nperseg=segment)
+        mic_spectra.append(_normalise_spectrum(mic_psd))
+    if not emg_spectra:
+        return None
+
+    return (
+        frequencies,
+        _to_db(np.mean(emg_spectra, axis=0)),
+        _to_db(np.mean(mic_spectra, axis=0)),
+        [record.recording_id for record in chosen],
+    )
+
+
+def _normalise_spectrum(psd: np.ndarray) -> np.ndarray:
+    total = float(psd.sum())
+    return psd / total if total > 0 else psd
+
+
+def _to_db(psd: np.ndarray) -> np.ndarray:
+    """Power spectrum in dB, shifted so its 99.5th percentile sits at 0 dB."""
+    floor = float(np.max(psd)) * 1e-9
+    decibels = 10 * np.log10(np.maximum(psd, max(floor, 1e-30)))
+    return decibels - float(np.percentile(decibels, 99.5))
+
+
 def plot_filter_response(
     filter_config: FilterChainConfig,
     sampling_rate: float,
     output_dir: Path,
     *,
     stem: str = "04_filter_response",
+    manifest: DatasetManifest | None = None,
 ) -> list[Path]:
-    """Magnitude response of every production filter stage and of the whole chain.
+    """Magnitude response of every production filter stage, over the measured spectrum.
 
     The dashed curve is the response actually realised: ``sosfiltfilt`` runs the chain
     forwards and backwards, so the effective magnitude is the square of the single-pass
     response and the phase is exactly zero -- which is also why the chain is acausal and
     supports no streaming claim.
-    """
-    from scipy.signal import sosfreqz
 
+    When ``manifest`` is supplied the mean **raw** spectrum of the data is drawn behind the
+    response, because a filter response on its own cannot be checked. Between 2026-07 and
+    2026-08 this figure showed a correct-looking 60 Hz notch beside a 20-450 Hz bandpass
+    while the recordings' three dominant peaks -- 180, 300 and 420 Hz -- sat in the
+    passband untouched, and nothing in the figure set said so (``cause.md``). A reader must
+    be able to see in one glance whether the notches land on the peaks.
+    """
     FigureStyle.apply()
     fig, axes = plt.subplots(1, 2, figsize=(12.0, 4.2), sharey=True)
     nyquist = sampling_rate / 2.0
+    worN = np.geomspace(0.5, nyquist * 0.999, 2048)
 
-    for ax, stages, title in (
-        (axes[0], filter_config.emg_stages, "EMG chain"),
-        (axes[1], filter_config.mic_stages, "Microphone chain"),
+    measured = measured_raw_spectrum(manifest) if manifest is not None else None
+
+    for panel, (ax, stages, title) in enumerate(
+        (
+            (axes[0], filter_config.emg_stages, "EMG chain"),
+            (axes[1], filter_config.mic_stages, "Microphone chain"),
+        )
     ):
+        if measured is not None:
+            spectrum_hz, emg_db, mic_db, _ = measured
+            ax.semilogx(
+                spectrum_hz,
+                emg_db if panel == 0 else mic_db,
+                color="#B0B0B0",
+                linewidth=0.8,
+                zorder=0,
+                label="measured raw spectrum (mean over participants, offset)",
+            )
         if not stages:
             ax.text(0.5, 0.5, "no stages configured", ha="center", transform=ax.transAxes)
             ax.set_title(title)
             continue
         combined: np.ndarray | None = None
-        frequencies = np.array([])
+        # One legend entry per distinct stage description: a seven-notch bank shares a
+        # single rationale and would otherwise fill the legend with seven near-identical
+        # lines.
+        labelled: set[str] = set()
         for index, stage in enumerate(stages):
-            sos = stage.design(sampling_rate)
-            worN = np.geomspace(0.5, nyquist * 0.999, 2048)
-            frequencies, response = sosfreqz(sos, worN=worN, fs=sampling_rate)
-            magnitude = np.abs(response)
+            magnitude = stage.magnitude_response(worN, sampling_rate)
             combined = magnitude if combined is None else combined * magnitude
+            label = _stage_legend_label(stages, stage)
             ax.semilogx(
-                frequencies,
+                worN,
                 20 * np.log10(np.maximum(magnitude, 1e-6)),
                 color=FigureStyle.color(index),
                 linewidth=1.2,
-                label=stage.describe(),
+                label=None if label in labelled else label,
             )
+            labelled.add(label)
         assert combined is not None
         ax.semilogx(
-            frequencies,
+            worN,
             20 * np.log10(np.maximum(combined, 1e-6)),
             color="#000000",
             linewidth=1.6,
@@ -636,7 +727,7 @@ def plot_filter_response(
         )
         if filter_config.zero_phase:
             ax.semilogx(
-                frequencies,
+                worN,
                 40 * np.log10(np.maximum(combined, 1e-6)),
                 color="#000000",
                 linewidth=1.2,
@@ -661,6 +752,14 @@ def plot_filter_response(
         "Designed with scipy second-order sections and applied to the continuous recording "
         "before any window is cut. "
         + (
+            "The grey trace is the mean raw power spectrum of the data, normalised per "
+            "recording and offset to share this axis; read it for WHERE the peaks are, "
+            "not for absolute level. Every notch must sit on a peak. "
+            if measured is not None
+            else "No data spectrum was supplied, so this figure shows the intended "
+            "response only and cannot show whether it matches the recordings. "
+        )
+        + (
             "Zero-phase filtering reads samples from the future of each output sample: it "
             "cannot support a real-time, streaming or wearable latency claim."
             if filter_config.zero_phase
@@ -668,6 +767,17 @@ def plot_filter_response(
         ),
     )
     return save_figure(fig, output_dir, stem)
+
+
+def _stage_legend_label(stages: Sequence[Any], stage: Any) -> str:
+    """Collapse a bank of identical-kind notches into one legend entry."""
+    if stage.kind != "notch":
+        return str(stage.describe())
+    notches = [s for s in stages if s.kind == "notch"]
+    if len(notches) == 1:
+        return str(stage.describe())
+    frequencies = ", ".join(f"{s.freq_hz:g}" for s in notches)
+    return f"notches at {frequencies} Hz (Q={stage.quality:g})"
 
 
 def plot_preprocessing_stages(
@@ -1060,8 +1170,9 @@ def plot_class_spectra(
         fig,
         "Welch estimates over a deterministic, evenly spaced sample of windows per class, "
         "computed after the production filter chain -- which is why EMG power falls away "
-        "outside 20-450 Hz and the 60 Hz notch is visible. Descriptive: windows are "
-        "correlated within participants and recordings.",
+        "outside 20-450 Hz and one notch per mains harmonic (60, 120, 180, 240, 300, 360, "
+        "420 Hz) is visible. Descriptive: windows are correlated within participants and "
+        "recordings.",
     )
     return save_figure(fig, output_dir, stem)
 

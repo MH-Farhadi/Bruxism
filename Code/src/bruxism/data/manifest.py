@@ -40,6 +40,10 @@ from bruxism.data.schema import (
     read_recording_csv,
     validate_columns,
 )
+from bruxism.preprocessing.interference import (
+    MAINS_CONTAMINATION_THRESHOLD,
+    measure_mains_contamination,
+)
 from bruxism.utils import progress
 from bruxism.utils.io import file_sha256, hash_mapping
 from bruxism.utils.logging import get_logger
@@ -58,7 +62,8 @@ __all__ = [
 logger = get_logger(__name__)
 
 #: Bump when the manifest column set changes. Runs record the version they were built with.
-MANIFEST_SCHEMA_VERSION: Final[str] = "1.0"
+#: 1.1 adds the mains-contamination columns.
+MANIFEST_SCHEMA_VERSION: Final[str] = "1.1"
 
 #: Directories under the data root that are never scanned for recordings. They hold
 #: administrative or identifiable material that is not research data.
@@ -331,6 +336,14 @@ class RecordingRecord:
     video_readable: bool
     startup_transient_seconds: float
     startup_transient_peak_ratio: float
+    #: Fraction of the RAW 20-450 Hz EMG power within 3 Hz of a mains multiple, pooled
+    #: over channels. Measured before any offline filtering, so it describes the
+    #: acquisition rather than the analysis.
+    mains_harmonic_power_fraction: float
+    #: Same fraction per EMG channel, in column order.
+    mains_harmonic_power_fraction_per_channel: list[float]
+    #: Per-harmonic breakdown, ``"60,0.0012;120,0.0033;..."`` in ascending frequency.
+    mains_harmonic_breakdown: str
     quality_flags: list[str]
     excluded: bool
     exclusion_reason: str
@@ -347,6 +360,9 @@ class RecordingRecord:
         row["conflict_rules_applied"] = ",".join(self.conflict_rules_applied)
         row["emg_min"] = ",".join(f"{value:.6g}" for value in self.emg_min)
         row["emg_max"] = ",".join(f"{value:.6g}" for value in self.emg_max)
+        row["mains_harmonic_power_fraction_per_channel"] = ",".join(
+            f"{value:.6g}" for value in self.mains_harmonic_power_fraction_per_channel
+        )
         row["trigger_run_boundaries"] = ";".join(
             f"{run['start_sample']}-{run['end_sample']}" for run in self.trigger_run_boundaries
         )
@@ -428,6 +444,9 @@ def _summarise_for_hash(records: Sequence[RecordingRecord]) -> dict[str, Any]:
                     "condition": record.condition,
                     "excluded": record.excluded,
                     "quality_flags": sorted(record.quality_flags),
+                    # Rounded: the fraction is a float derived from a Welch estimate, and
+                    # the manifest hash must not depend on the last bit of a PSD.
+                    "mains_harmonic_power_fraction": round(record.mains_harmonic_power_fraction, 6),
                 }
                 for record in records
             ),
@@ -564,6 +583,13 @@ def _iter_records(
         if settle_seconds > 0.0:
             flags.add(QualityFlag.STARTUP_TRANSIENT)
 
+        # Measured on the RAW signal: the point is to describe what the amplifier
+        # delivered, independently of whatever the offline chain later removes. A chain
+        # that removes the interference must not make the interference invisible.
+        mains = measure_mains_contamination(emg, sampling_rate)
+        if mains.fraction > MAINS_CONTAMINATION_THRESHOLD:
+            flags.add(QualityFlag.MAINS_CONTAMINATION)
+
         is_rest = condition == "rest"
         if is_rest and runs:
             flags.add(QualityFlag.UNEXPECTED_TRIGGER_IN_REST)
@@ -639,6 +665,11 @@ def _iter_records(
             npy_disagreement=npy_detail or None,
             startup_transient_seconds=settle_seconds,
             startup_transient_peak_ratio=peak_ratio,
+            mains_harmonic_power_fraction=mains.fraction,
+            mains_harmonic_power_fraction_per_channel=list(mains.per_channel),
+            mains_harmonic_breakdown=";".join(
+                f"{frequency},{value:.6g}" for frequency, value in mains.per_harmonic.items()
+            ),
             quality_flags=sorted(flag.value for flag in flags),
             excluded=excluded,
             exclusion_reason=reason,
@@ -758,6 +789,11 @@ def load_manifest(
         ]
         payload["emg_min"] = [float(v) for v in str(payload["emg_min"]).split(",") if v]
         payload["emg_max"] = [float(v) for v in str(payload["emg_max"]).split(",") if v]
+        payload["mains_harmonic_power_fraction_per_channel"] = [
+            float(v)
+            for v in str(payload["mains_harmonic_power_fraction_per_channel"]).split(",")
+            if v
+        ]
         payload["trigger_run_boundaries"] = [
             {"start_sample": int(span.split("-")[0]), "end_sample": int(span.split("-")[1])}
             for span in str(payload["trigger_run_boundaries"]).split(";")

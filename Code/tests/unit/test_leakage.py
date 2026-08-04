@@ -16,6 +16,7 @@ from bruxism.preprocessing.augmentation import (
     AugmentationStageError,
     Augmenter,
 )
+from bruxism.preprocessing.calibration import build_calibration_block
 from bruxism.preprocessing.normalization import NormalizationConfig, Normalizer, NotFittedError
 
 
@@ -164,6 +165,143 @@ def test_normalizer_changes_with_training_data_not_with_held_out_data(rng):
     assert not np.allclose(a.emg_center, b.emg_center)
 
 
+# --------------------------------------- per-participant calibration (Phase 3) ---
+
+
+def _mixed_index() -> WindowIndex:
+    """Five participants, each with a rest recording and two active families.
+
+    30 rest windows per participant, so the default 20-window calibration cap still leaves
+    the rest class trainable -- the condition ``_assert_leaves_every_class_trainable``
+    exists to enforce.
+    """
+    windows: list[WindowRecord] = []
+    for subject in (f"S0{s}" for s in range(1, 6)):
+        for index in range(30):
+            windows.append(_window(subject, index))
+        for family, offset in (("clench", 100), ("chewing", 200)):
+            for run in range(3):
+                for index in range(2):
+                    position = offset + run * 10 + index
+                    window = _window(subject, position)
+                    windows.append(
+                        WindowRecord(
+                            **{
+                                **window.to_row(),
+                                "recording_id": f"{subject}_{family}",
+                                "condition": family,
+                                "condition_token": family,
+                                "task_family": family,
+                                "trigger_run_index": run,
+                                "segment_source": "trigger_active",
+                            }
+                        )
+                    )
+    return WindowIndex(
+        windows=windows,
+        config=SegmentationConfig(),
+        sampling_rate_hz=1200,
+        manifest_hash="h",
+    )
+
+
+def test_participant_scope_requires_a_declared_calibration_source():
+    """The transductive scope cannot be selected without saying what calibrates it."""
+    with pytest.raises(ValueError, match="requires a calibration source"):
+        NormalizationConfig(scope="per_participant")
+    with pytest.raises(ValueError, match="only applies to"):
+        NormalizationConfig(scope="per_channel", calibration="rest_plus_one_repetition")
+    with pytest.raises(ValueError, match="upper bound"):
+        NormalizationConfig(scope="per_participant", calibration="all_windows_upper_bound")
+
+
+def test_calibration_block_is_rest_plus_one_repetition_per_family():
+    block = build_calibration_block(_mixed_index())
+    detail = block.detail["S01"]
+    assert set(detail["by_family"]) == {"rest", "clench", "chewing"}
+    # Exactly one trigger run per active family -- a fitting session, not a whole session.
+    assert detail["by_family"]["clench"]["runs"] == ["0"]
+    assert detail["by_family"]["chewing"]["runs"] == ["0"]
+    assert block.to_dict()["uses_held_out_labels"] is False
+    # Capped: a fitting session records a little rest, not the participant's only rest
+    # recording in its entirety.
+    assert detail["by_family"]["rest"]["n_windows"] == 20
+
+
+def test_a_calibration_block_that_would_consume_a_whole_class_is_refused():
+    """The rest class has one recording per participant; an uncapped block eats it."""
+    index = _mixed_index()
+    with pytest.raises(ValueError, match="would consume every window"):
+        build_calibration_block(index, max_windows_per_family=1000)
+
+
+def test_calibration_windows_are_withheld_from_every_split():
+    """A window that set a participant's scale is neither trained on nor scored."""
+    index = _mixed_index()
+    block = build_calibration_block(index)
+    splitter = NestedLOSOSplitter(index, exclude_sample_ids=block.all_sample_ids)
+    for fold in splitter.outer_folds():
+        assert not set(fold.train_sample_ids) & block.all_sample_ids
+        released = fold.release_test_ids(purpose="final_evaluation")
+        assert not set(released) & block.all_sample_ids
+        for inner in fold.inner_folds:
+            assert not set(inner.train_sample_ids) & block.all_sample_ids
+            assert not set(inner.val_sample_ids) & block.all_sample_ids
+
+
+def test_participant_calibration_never_touches_held_out_labels(rng):
+    """The calibrated normalizer sees signal only, and says so in its own bookkeeping."""
+    config = NormalizationConfig(scope="per_participant", calibration="rest_plus_one_repetition")
+    normalizer = Normalizer(config).fit(
+        rng.standard_normal((500, 4)), rng.standard_normal(500), subjects=("S01", "S02")
+    )
+    normalizer.calibrate(
+        "S05",
+        7.0 + 3.0 * rng.standard_normal((200, 4)),
+        rng.standard_normal(200),
+        sample_ids=("S05#0001",),
+    )
+
+    # The held-out participant is calibrated but NOT fitted on: the distinction the whole
+    # protocol rests on.
+    assert normalizer.calibrated_on == ("S05",)
+    assert "S05" not in normalizer.fitted_on
+    normalizer.assert_not_fitted_on(["S05"])  # must not raise
+
+    # `calibrate` has no label parameter to misuse.
+    import inspect
+
+    assert "label" not in inspect.signature(Normalizer.calibrate).parameters
+
+    # A calibration window that is also evaluated is refused.
+    with pytest.raises(AssertionError, match="calibration windows are also being evaluated"):
+        normalizer.assert_calibration_disjoint_from(["S05#0001", "S05#0002"])
+    normalizer.assert_calibration_disjoint_from(["S05#0002"])
+
+
+def test_calibrated_statistics_are_applied_per_participant(rng):
+    """A calibrated participant is standardised by their own scale, not the pooled one."""
+    config = NormalizationConfig(scope="per_participant", calibration="rest_plus_one_repetition")
+    normalizer = Normalizer(config).fit(
+        rng.standard_normal((500, 4)), rng.standard_normal(500), subjects=("S01",)
+    )
+    # S05 records at 10x the amplitude of everyone else.
+    block = 10.0 * rng.standard_normal((400, 4))
+    normalizer.calibrate("S05", block, rng.standard_normal(400), sample_ids=("S05#0001",))
+
+    window = 10.0 * rng.standard_normal((300, 4))
+    calibrated = normalizer.transform_emg(window, subject="S05")
+    pooled = normalizer.transform_emg(window, subject="S01")
+    assert abs(calibrated.std() - 1.0) < 0.2, "calibrated participant should be unit scale"
+    assert pooled.std() > 5.0, "the pooled statistic cannot align a 10x participant"
+
+
+def test_calibrate_is_refused_when_the_scope_would_ignore_it():
+    normalizer = Normalizer(NormalizationConfig(scope="per_channel"))
+    with pytest.raises(ValueError, match="requires scope='per_participant'"):
+        normalizer.calibrate("S01", np.ones((10, 4)), np.ones(10))
+
+
 def test_normalizer_roundtrips_through_serialisation(rng):
     original = Normalizer(NormalizationConfig(method="robust")).fit(
         rng.standard_normal((400, 4)), rng.standard_normal(400), subjects=("S01",)
@@ -218,3 +356,30 @@ def test_augmentation_skips_non_minority_classes_when_configured(rng):
 def test_minority_labels_derive_from_training_counts_only():
     labels = Augmenter.minority_labels_from_counts({0: 100, 1: 60, 2: 95}, threshold=0.7)
     assert labels == frozenset({1})
+
+
+def test_every_config_to_dict_round_trips_through_the_loader(tmp_path):
+    """A run bundle must be readable by the code that wrote it.
+
+    ``resolved_config.yaml`` is re-loaded by ``bruxism-figures`` and by every resumed run,
+    and ExperimentConfig rejects unknown keys by design -- so any derived entry in a
+    ``to_dict()`` makes the bundle unloadable. ``is_transductive`` was exactly that bug,
+    and it only surfaced in an integration test 20 minutes deep.
+    """
+    from bruxism.config import ExperimentConfig, load_experiment_config
+    from bruxism.utils.io import write_yaml
+
+    for scope, calibration in (
+        ("per_channel", "none"),
+        ("global", "none"),
+        ("per_participant", "rest_plus_one_repetition"),
+    ):
+        config = ExperimentConfig(
+            name="roundtrip",
+            normalization=NormalizationConfig(scope=scope, calibration=calibration),
+        )
+        path = tmp_path / f"{scope}.yaml"
+        write_yaml(path, config.to_dict())
+        reloaded = load_experiment_config(path)
+        assert reloaded.to_dict() == config.to_dict()
+        assert reloaded.config_hash == config.config_hash

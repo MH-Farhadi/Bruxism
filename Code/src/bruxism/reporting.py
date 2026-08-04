@@ -168,6 +168,37 @@ def render_audit_markdown(audit: dict[str, Any], manifest: Any) -> str:  # noqa:
         "## 7. Segmentation guard sensitivity",
         "",
         _table(pd.DataFrame(audit["guard_sensitivity"])),
+        "## 7b. Mains interference in the raw signal",
+        "",
+    ]
+
+    mains = audit.get("mains_contamination")
+    if mains:
+        lines += [
+            f"Share of the raw {mains['band_hz'][0]:g}-{mains['band_hz'][1]:g} Hz EMG power "
+            f"lying within {mains['half_width_hz']:g} Hz of a multiple of the mains "
+            f"frequency. Measured on the **{mains['measured_on']}**, so it describes the "
+            "acquisition and is unchanged by the offline chain.",
+            "",
+            f"- Recordings flagged above {mains['threshold']:.2f}: "
+            f"**{mains['n_flagged']} of {mains['n_recordings']}**",
+            f"- Median across recordings: **{mains['median_fraction']:.3f}**; "
+            f"maximum: **{mains['max_fraction']:.3f}**",
+            "",
+            "By participant:",
+            "",
+            _table(pd.DataFrame(mains["by_subject"])),
+            "By condition:",
+            "",
+            _table(pd.DataFrame(mains["by_condition"])),
+            "Worst recordings:",
+            "",
+            _table(pd.DataFrame(mains["worst_recordings"])),
+            f"> **Policy.** {mains['policy']}",
+            "",
+        ]
+
+    lines += [
         "## 8. Window counts",
         "",
         f"- `whole_recording_legacy` (**diagnostic only, unsafe for inference**): "

@@ -30,6 +30,21 @@ Specific things you must not infer from anything this code produces:
 Five participants cannot characterise population variability. The production filter chain is
 zero-phase (acausal) and no streaming implementation exists.
 
+> ### ⚠ Results produced before 2026-08-03 are superseded
+>
+> Until 2026-08-03 the EMG chain notched 60 Hz and band-passed 20–450 Hz. The acquisition
+> hardware had **already** removed 60 Hz (`notch_filter: Index 9`), so that stage removed
+> the one mains frequency that was not there, while 180/300/420 Hz — at 37,000× to 846,000×
+> the local noise floor — passed straight through. **85–99 % of the in-band power of the
+> "filtered" EMG was powerline interference**, and every rest recording was between 91 % and
+> 99.8 %.
+>
+> The chain now notches every mains multiple inside the passband. Fixing only that moves a
+> logistic regression on band energies from macro-F1 0.419 to 0.679 under LOSO. Every result
+> produced before the fix is **not comparable** to any result produced after it. See
+> [`../cause.md`](../cause.md), [`../opus_report_1.md`](../opus_report_1.md) and
+> `docs/open_questions.md` Q9.
+
 Several statements the manuscript needs are **blocked** on human decisions that no amount of
 code can settle — hardware and units, IRB identifier, recruitment evidence, protocol timing.
 See **[`docs/open_questions.md`](docs/open_questions.md)**.
@@ -82,6 +97,13 @@ Console scripts are installed by `pip install -e .`. Each is equivalently
 | Check the manifest without writing anything | `bruxism-audit --data-root ../Data --validate-only` |
 | Build the versioned analysis window index | `bruxism-build-manifest --config configs/data/trigger_constrained.yaml --data-root ../Data` |
 | Plot raw vs production-filtered traces | `bruxism-plot-preprocessing --data-root ../Data` |
+| **Compare signal chains and preprocessing choices** (minutes, not hours) | `bruxism-screen --data-root ../Data` |
+
+`bruxism-screen` runs a leave-one-subject-out logistic regression and gradient boosting on
+35 band-energy features, over any set of filter variants, normalisation scopes and
+aggregation lengths. It answers "is this change worth a confirmatory run?" in minutes
+instead of hours. **Its numbers are screening estimates and are never a reported result** —
+one fit per fold, no nested selection. Every output it writes says so.
 
 ### Train
 

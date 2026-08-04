@@ -139,26 +139,83 @@ selected as best** (`MULTISEED_RULE` in `evaluation/aggregation.py`).
 
 ## 5. Preprocessing
 
+**Revised 2026-08-03.** Everything produced before that date used the superseded chain in
+the second table and is not comparable to anything produced after it.
+
 | Stage | Setting | Rationale |
 |---|---|---|
-| Notch | 60 Hz, Q = 30 | North American mains |
+| Notch bank | 60, 120, 180, 240, 300, 360, 420 Hz — every mains multiple in the passband, each 8 Hz wide | The hardware had already removed the fundamental (`notch_filter: Index 9`, `open_questions.md` Q9); the surviving interference was entirely at the harmonics, at 37,000×–846,000× the local noise floor |
 | Bandpass | 20–450 Hz, order 4 | surface-EMG band, below the 600 Hz Nyquist |
 | Microphone | 20 Hz high-pass, order 2 | DC offset only; transducer response undocumented |
 | Mode | zero-phase (`sosfiltfilt`) | **acausal / offline** |
 
+**Superseded (every run before 2026-08-03):** a single 60 Hz notch at Q = 30, then the same
+bandpass. It removed the one mains frequency the hardware had already taken out and passed
+the three that dominated the recordings; 85–99 % of the in-band power of the "filtered"
+signal was interference. See `cause.md` and `opus_report_1.md`.
+
+**Notches are constant-width (8 Hz), not constant-Q.** Constant Q gives 2 Hz at 60 Hz and
+14 Hz at 420 Hz — narrowest exactly where the hardware notch left a residue. At an identical
+13 % total band cost, constant-width notches leave the worst-contaminated cell at 8.0 %
+harmonic power and 3.2× its local floor, against 22.4 % and 25.6× for Q = 30. A comb and
+spectral interpolation were both implemented and measured; both left more residue
+(`bruxism-screen`, `outputs/screening/<stamp>/`).
+
 The prototype's third stage — a 5 Hz high-pass after a 20–450 Hz bandpass — is a no-op and
-was removed rather than carried forward. ⚠ Whether the acquisition hardware already applied
-its own filtering is unknown (`open_questions.md` Q3/Q9).
+was removed rather than carried forward.
 
 **Zero-phase filtering reads samples from the future of each output sample.** It cannot
 support any real-time, streaming or wearable claim. A causal mode exists
-(`zero_phase: false`) and the mode used is recorded in every run bundle.
+(`zero_phase: false`) and the mode used is recorded in every run bundle. A
+spectral-interpolation stage, if ever selected, is acausal regardless of that setting and
+`FilterChainConfig.is_causal` accounts for it.
 
 ### 5.1 Normalisation
 
+**Strict (default, and the number that supports a no-calibration deployment claim).**
 Per-channel z-scoring, fitted on training participants only, saved in every run bundle with
 the list of participants that produced it, and asserted against the held-out participant
 before every evaluation.
+
+**Calibrated (`scope: per_participant`) — a protocol change, and reported as one.** Each
+participant's windows are standardised by that participant's own statistics, *including the
+held-out participant's*. This is transductive test-time adaptation: it uses the held-out
+participant's **signal** and never their **labels**. Screening values it at about +0.04
+macro-F1 once the filter is fixed (0.689 → 0.731), i.e. second-order compared with the
+filter fix.
+
+Two attributes keep the concession legible and impossible to confuse with leakage:
+
+| Attribute | Meaning | May contain the held-out participant? |
+|---|---|---|
+| `Normalizer.fitted_on` | participants whose **labelled training windows** produced the pooled statistics | **No** — `assert_not_fitted_on` enforces it, unchanged |
+| `Normalizer.calibrated_on` | participants whose **unlabelled calibration block** produced their own statistics | Yes, by design, and disclosed |
+
+#### The calibration block
+
+Defined in `preprocessing/calibration.py`. It is what a fitting session produces before any
+diagnosis is attempted, and it is **not** the whole labelled session:
+
+- the participant's **dedicated rest recording** (baseline), plus
+- **one guided repetition of each task family** — the first trigger run of the first
+  recording of that family (dynamic range).
+
+Selection is deterministic (sorted order, never sampled). The block is **withheld from every
+split** by `NestedLOSOSplitter(exclude_sample_ids=...)`, so no window can both set a
+participant's scale and be scored by it; `assert_calibration_disjoint_from` re-checks this
+at every fold. Exactly which windows produced each participant's statistics is written to
+`<run_dir>/calibration_block.json`.
+
+`calibration: all_windows_upper_bound` exists for measuring the ceiling and requires
+`calibration_approved_by`, because it is an upper bound rather than a deployable procedure.
+
+**Two scopes were measured and rejected:**
+
+| Scope | Screening macro-F1 | Why rejected |
+|---|---:|---|
+| per-**recording** | 0.036 | Each recording holds one condition, so per-recording scaling removes the label itself |
+| per-participant **robust** (median/MAD) | 0.409 | The distribution is multimodal and chewing-dominated; the MAD tracks the majority class |
+| per-participant mean/std | **0.527** (contaminated) / **0.731** (clean) | Adopted |
 
 ### 5.2 Augmentation
 
@@ -189,6 +246,38 @@ PPV, NPV, F1, ROC-AUC and PR-AUC.
 Every metric is computed from the saved prediction ledger, in which each held-out example
 appears exactly once per task/model/modality/seed with its full probability vector and the
 source commit, config hash, manifest hash and checkpoint hash.
+
+### 6.1 Probability calibration
+
+Held-out probabilities from the 2026-07/08 runs are **uncalibrated** (ECE 0.276, figure
+`19_calibration`). Two consequences, both of which must appear in the manuscript:
+
+- the probabilities must not be read as probabilities;
+- **every AUC remains valid.** AUC is rank-based and no monotone rescaling of the scores can
+  change it.
+
+`evaluation/calibration.py` implements temperature scaling for runs that choose to fix it.
+The temperature is a single scalar fitted by bounded scalar minimisation of the negative log
+likelihood; it is monotone, so accuracy, macro-F1 and AUC are unchanged by construction and
+`TemperatureScaler.report` asserts that the predictions did not move. It **must** be fitted
+on inner-validation folds — participants in neither the final model's training set nor the
+held-out set — and `assert_not_fitted_on` refuses to apply a temperature to a participant it
+saw.
+
+### 6.2 Temporal aggregation — trial-level, and labelled as such
+
+Averaging held-out probabilities across consecutive windows of one recording lifts screening
+macro-F1 from 0.731 (1 window) to 0.821 (16 windows ≈ 8.5 s), monotonically. This is a real
+effect and a **trial-level** one: every recording in this dataset contains a single
+condition, so averaging inside a recording approaches a majority vote over a homogeneous
+trial.
+
+- **Window-level is primary.**
+- Aggregation is a **clearly labelled secondary analysis**, stating the aggregation length
+  and the homogeneous-trial assumption. `aggregate_within_recording` carries that label in
+  its own return value.
+- It is **not** continuous-stream or event detection. That claim needs onset/offset
+  evaluation on mixed-activity data, which this dataset does not contain.
 
 ---
 

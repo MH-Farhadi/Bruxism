@@ -31,6 +31,7 @@ from bruxism.data.segments import WindowIndex, build_window_index
 from bruxism.evaluation.aggregation import summarise_ledger
 from bruxism.evaluation.metrics import PredictionLedger
 from bruxism.models.ablations import AblationSpec
+from bruxism.preprocessing.calibration import build_calibration_block
 from bruxism.training.engine import NestedLOSOTrainer, resolve_device
 from bruxism.utils import progress
 from bruxism.utils.io import (
@@ -213,6 +214,23 @@ def run_experiment(
             source_state.diff_sha256,
         )
 
+    # Per-participant normalisation needs a calibration block, and the block must be
+    # withheld from every split -- so it is built before the splits, not inside training.
+    calibration_block = None
+    if config.normalization.scope == "per_participant":
+        calibration_block = build_calibration_block(
+            window_index,
+            source=config.normalization.calibration,
+            subjects=config.data.subjects,
+        )
+        write_json(run_dir / "calibration_block.json", calibration_block.to_dict())
+        logger.warning(
+            "TRANSDUCTIVE PROTOCOL: %d calibration window(s) withheld from every split and "
+            "used to set each participant's own normalisation scale, including the "
+            "held-out participant's. Report these results as requiring a fitting session.",
+            len(calibration_block.all_sample_ids),
+        )
+
     conditions = _conditions(config)
     plan: dict[str, Any] = {
         "run_id": run_id,
@@ -220,6 +238,12 @@ def run_experiment(
         "seeds": list(config.training.seeds),
         "safe_for_inference": window_index.safe_for_inference,
         "segmentation_policy": str(window_index.config.policy),
+        "normalization": {
+            **config.normalization.to_dict(),
+            # Derived, so it lives here rather than in the round-tripped configuration.
+            "is_transductive": config.normalization.is_transductive,
+        },
+        "calibration_block": calibration_block.to_dict() if calibration_block else None,
     }
     first_task = get_task(conditions[0].task_id)
     planner = NestedLOSOTrainer(
@@ -230,6 +254,7 @@ def run_experiment(
         run_dir=run_dir,
         source_commit=source_state.commit,
         manifest_hash=manifest.manifest_hash,
+        calibration_block=calibration_block,
     )
     plan["folds"] = planner.split_plan()
     write_json(run_dir / "folds.json", plan)
@@ -240,7 +265,11 @@ def run_experiment(
 
     from bruxism.data.splits import NestedLOSOSplitter
 
-    splitter = NestedLOSOSplitter(window_index, subjects=config.data.subjects)
+    splitter = NestedLOSOSplitter(
+        window_index,
+        subjects=config.data.subjects,
+        exclude_sample_ids=(calibration_block.all_sample_ids if calibration_block else frozenset()),
+    )
     n_planned = len(conditions) * len(config.training.seeds) * splitter.n_outer_folds
     if max_folds is not None:
         n_planned = min(n_planned, max_folds)
@@ -279,6 +308,7 @@ def run_experiment(
                 manifest_hash=manifest.manifest_hash,
                 model_id=spec.model_id,
                 modality=spec.modality,
+                calibration_block=calibration_block,
             )
             for seed in config.training.seeds:
                 for fold in splitter.outer_folds():

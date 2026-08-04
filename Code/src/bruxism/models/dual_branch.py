@@ -42,24 +42,79 @@ __all__ = [
 Modality = Literal["fusion", "emg_only", "audio_only"]
 
 
+TemporalPooling = Literal["avg", "stats", "segments", "stats_segments"]
+
+
 @dataclass(frozen=True)
 class BranchConfig:
-    """One modality branch: its wavelet decomposition and per-band convolutional widths."""
+    """One modality branch: its wavelet decomposition and per-band convolutional widths.
+
+    Attributes
+    ----------
+    pooling
+        How each band's convolutional feature map is reduced to a fixed-width vector.
+
+        ``"avg"``
+            ``AdaptiveAvgPool1d(1)``: the mean over the whole window. This is what the
+            original model did, and it is why a logistic regression on hand-computed band
+            energies matched it exactly (``cause.md`` §4) -- averaging a ~7-tap detector
+            over a second leaves a per-band mean rectified amplitude and nothing else.
+        ``"stats"``
+            Mean, standard deviation and max. Three numbers instead of one; the standard
+            deviation is the cheapest possible measure of whether a band is bursting or
+            steady, which is the clench/chew distinction.
+        ``"segments"``
+            ``AdaptiveAvgPool1d(n_segments)``: keeps a coarse temporal layout, so onset
+            shape survives.
+        ``"stats_segments"``
+            Both.
+    n_segments
+        Segments kept by the ``segments`` poolings.
+    modulation
+        Add a modulation-spectrum head over each band's envelope. Chewing and grinding are
+        distinguished from clenching by 1-2 Hz burst-relax rhythm, which every pooling
+        above still discards; this measures it directly. See :class:`_ModulationPool`.
+    modulation_bins
+        Number of modulation-frequency bins retained, from ``modulation_low_hz`` upwards.
+    """
 
     in_channels: int = 4
     wavelet: WaveletConfig = WaveletConfig(wavelet="db4", level=4, bands=("A4", "D3", "D1"))
     hidden_channels: tuple[int, int] = (8, 16)
     kernel_size: int = 3
     pool_size: int = 2
+    pooling: TemporalPooling = "avg"
+    n_segments: int = 4
+    modulation: bool = False
+    modulation_bins: int = 6
+    modulation_frames: int = 64
+
+    def __post_init__(self) -> None:
+        if self.pooling not in ("avg", "stats", "segments", "stats_segments"):
+            raise ValueError(f"unknown pooling {self.pooling!r}")
+        if self.n_segments < 1:
+            raise ValueError(f"n_segments must be >= 1, got {self.n_segments}")
+        if self.modulation and self.modulation_bins < 1:
+            raise ValueError("modulation_bins must be >= 1 when modulation is enabled")
 
     @property
     def n_bands(self) -> int:
         return len(self.wavelet.bands)
 
     @property
+    def pool_multiplier(self) -> int:
+        """How many values the temporal pooling emits per feature channel."""
+        segments = self.n_segments if "segments" in self.pooling else 1
+        statistics = 3 if "stats" in self.pooling else 1
+        return segments * statistics
+
+    @property
     def out_features(self) -> int:
-        """Feature width contributed by this branch: one pooled vector per band."""
-        return self.n_bands * self.hidden_channels[-1]
+        """Feature width contributed by this branch, across all bands."""
+        per_band = self.hidden_channels[-1] * self.pool_multiplier
+        if self.modulation:
+            per_band += self.in_channels * self.modulation_bins
+        return self.n_bands * per_band
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -132,14 +187,87 @@ class DualBranchConfig:
         return cls(**data)
 
 
+class _TemporalPool(nn.Module):
+    """Reduce ``(batch, channels, time)`` to a fixed-width vector, keeping time or not.
+
+    ``AdaptiveAvgPool1d(1)`` -- the original behaviour -- destroys every temporal fact
+    about the window. The other modes keep some: ``stats`` keeps how much the band varies
+    and how high it peaks, ``segments`` keeps a coarse layout.
+    """
+
+    def __init__(self, mode: TemporalPooling, n_segments: int):
+        super().__init__()
+        self.mode = mode
+        self.n_segments = n_segments if "segments" in mode else 1
+        self.pool = nn.AdaptiveAvgPool1d(self.n_segments)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if "stats" not in self.mode:
+            return self.pool(x).flatten(1)
+        if self.n_segments == 1:
+            blocks = [x]
+        else:
+            # Split into contiguous, near-equal segments and take statistics within each.
+            blocks = list(torch.chunk(x, self.n_segments, dim=-1))
+        parts: list[torch.Tensor] = []
+        for block in blocks:
+            parts.append(block.mean(dim=-1))
+            # unbiased=False keeps this defined for a single-sample segment.
+            parts.append(block.std(dim=-1, unbiased=False))
+            parts.append(block.amax(dim=-1))
+        return torch.cat(parts, dim=1)
+
+
+class _ModulationPool(nn.Module):
+    """Modulation spectrum of a band's envelope, in the 1-2 Hz burst-rhythm range.
+
+    Chewing and grinding differ from clenching by *rhythm*: burst-relax cycles at roughly
+    1-2 Hz. Convolutional features pooled over the window cannot express that, which is a
+    structural reason -- not a capacity one -- why the original model could not separate
+    those classes. This computes it explicitly and differentiably:
+
+    ``|x|`` -> average-pool to ``n_frames`` -> remove the mean -> ``rfft`` -> magnitudes of
+    the first ``n_bins`` modulation frequencies above DC.
+
+    Over a 1 s window with 64 frames the bin spacing is 1 Hz, so six bins cover 1-6 Hz.
+    """
+
+    def __init__(self, n_frames: int, n_bins: int):
+        super().__init__()
+        self.n_frames = n_frames
+        self.n_bins = n_bins
+        self.envelope = nn.AdaptiveAvgPool1d(n_frames)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        frames = self.envelope(x.abs())
+        frames = frames - frames.mean(dim=-1, keepdim=True)
+        spectrum = torch.fft.rfft(frames, dim=-1).abs()
+        # Bin 0 is DC and was just removed; take the bins above it.
+        available = spectrum.shape[-1] - 1
+        taken = spectrum[..., 1 : 1 + min(self.n_bins, available)]
+        if taken.shape[-1] < self.n_bins:
+            taken = nn.functional.pad(taken, (0, self.n_bins - taken.shape[-1]))
+        # Log-compress: envelope magnitudes are multiplicative across participants.
+        return torch.log1p(taken).flatten(1)
+
+
 class _BandBranch(nn.Module):
     """Convolutional stack applied to one wavelet band, pooled to a fixed-width vector."""
 
-    def __init__(self, in_channels: int, hidden: tuple[int, int], kernel_size: int, pool: int):
+    def __init__(
+        self,
+        in_channels: int,
+        hidden: tuple[int, int],
+        kernel_size: int,
+        pool: int,
+        *,
+        pooling: TemporalPooling = "avg",
+        n_segments: int = 4,
+    ):
         super().__init__()
         first, second = hidden
         padding = kernel_size // 2
-        self.net = nn.Sequential(
+        self.features = nn.Sequential(
             nn.Conv1d(in_channels, first, kernel_size=kernel_size, padding=padding),
             nn.BatchNorm1d(first),
             nn.ReLU(inplace=True),
@@ -147,11 +275,11 @@ class _BandBranch(nn.Module):
             nn.Conv1d(first, second, kernel_size=kernel_size, padding=padding),
             nn.BatchNorm1d(second),
             nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool1d(1),
         )
+        self.pool = _TemporalPool(pooling, n_segments)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x).squeeze(-1)
+        return self.pool(self.features(x))
 
 
 class _ModalityBranch(nn.Module):
@@ -168,17 +296,30 @@ class _ModalityBranch(nn.Module):
                     config.hidden_channels,
                     config.kernel_size,
                     config.pool_size,
+                    pooling=config.pooling,
+                    n_segments=config.n_segments,
                 )
                 for band in config.wavelet.bands
             }
         )
+        self.modulation = (
+            _ModulationPool(config.modulation_frames, config.modulation_bins)
+            if config.modulation
+            else None
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         coefficients = self.decompose(x)
-        return torch.cat(
-            [self.bands[band](coefficients[band]) for band in self.config.wavelet.bands],
-            dim=1,
-        )
+        parts: list[torch.Tensor] = []
+        for band in self.config.wavelet.bands:
+            coefficient = coefficients[band]
+            parts.append(self.bands[band](coefficient))
+            if self.modulation is not None:
+                # Rhythm is read from the raw band envelope, not from the convolutional
+                # features: the conv stack has already pooled away the time axis by a
+                # factor of `pool_size` and its output is not an envelope.
+                parts.append(self.modulation(coefficient))
+        return torch.cat(parts, dim=1)
 
 
 class DualBranchWaveletCNN(nn.Module):

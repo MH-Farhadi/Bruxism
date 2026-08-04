@@ -19,14 +19,17 @@ import torch
 from torch import nn
 
 from bruxism.models.dual_branch import (
+    BranchConfig,
     DualBranchConfig,
     Modality,
     build_model,
 )
+from bruxism.preprocessing.wavelets import WaveletConfig
 
 __all__ = [
     "NEURAL_MODEL_IDS",
     "SKLEARN_MODEL_IDS",
+    "TEMPORAL_DUAL_BRANCH_DEFAULTS",
     "BiLSTMBaseline",
     "BiLSTMConfig",
     "EarlyFusionCNN",
@@ -36,8 +39,53 @@ __all__ = [
     "build_sklearn_model",
 ]
 
-NEURAL_MODEL_IDS: tuple[str, ...] = ("dual_branch_wavelet_cnn", "early_fusion_cnn", "bilstm")
+NEURAL_MODEL_IDS: tuple[str, ...] = (
+    "dual_branch_wavelet_cnn",
+    "dual_branch_temporal_cnn",
+    "early_fusion_cnn",
+    "bilstm",
+)
 SKLEARN_MODEL_IDS: tuple[str, ...] = ("random_forest", "mlp", "logistic_regression")
+
+#: ``dual_branch_temporal_cnn`` is ``dual_branch_wavelet_cnn`` with the time axis kept.
+#:
+#: The original pooled each band to a single mean over the whole window, which is why a
+#: logistic regression on band energies matched it exactly (``cause.md`` §4): the network
+#: was a band-energy calculator with extra steps. This variant adds exactly the two
+#: capabilities the diagnosis says are missing, and nothing else:
+#:
+#: * ``pooling="stats"`` -- mean, standard deviation and max per band instead of the mean
+#:   alone, so *how much a band varies* is representable at all;
+#: * ``modulation=True`` -- a modulation spectrum of each band's envelope, so the 1-2 Hz
+#:   burst-relax rhythm that separates chewing and grinding from clenching is measured
+#:   directly.
+#:
+#: Capacity is deliberately not grown further. Four-segment pooling was tried first and
+#: reached 98,957 parameters against roughly 6,000 training windows, almost all of it in
+#: one dense fusion layer; this configuration is 3x the original rather than 13x, and every
+#: added feature answers a named deficiency. It is a separate ``model_id`` rather than a
+#: changed default so the superseded model stays reproducible and the two appear side by
+#: side in one table.
+TEMPORAL_DUAL_BRANCH_DEFAULTS: dict[str, Any] = {
+    "emg": BranchConfig(
+        in_channels=4,
+        wavelet=WaveletConfig(wavelet="db4", level=4, bands=("A4", "D3", "D1")),
+        hidden_channels=(8, 16),
+        pooling="stats",
+        modulation=True,
+        modulation_bins=6,
+    ),
+    "mic": BranchConfig(
+        in_channels=1,
+        wavelet=WaveletConfig(wavelet="coif5", level=5, bands=("A5", "D3", "D1")),
+        hidden_channels=(4, 8),
+        pooling="stats",
+        modulation=True,
+        modulation_bins=6,
+    ),
+    "fusion_hidden": (64, 32),
+    "dropout": 0.5,
+}
 
 
 def _stack_modalities(
@@ -243,7 +291,11 @@ def build_neural_model(
         back to a default architecture.
     """
     extra = dict(overrides or {})
-    if model_id == "dual_branch_wavelet_cnn":
+    if model_id in ("dual_branch_wavelet_cnn", "dual_branch_temporal_cnn"):
+        from dataclasses import replace as dataclass_replace
+
+        if model_id == "dual_branch_temporal_cnn":
+            extra = {**TEMPORAL_DUAL_BRANCH_DEFAULTS, **extra}
         config = DualBranchConfig(
             num_classes=num_classes,
             modality=modality,
@@ -251,22 +303,8 @@ def build_neural_model(
             **extra,
         )
         if config.emg.in_channels != emg_channels:
-            from bruxism.models.dual_branch import BranchConfig
-
-            config = DualBranchConfig(
-                num_classes=num_classes,
-                emg=BranchConfig(
-                    in_channels=emg_channels,
-                    wavelet=config.emg.wavelet,
-                    hidden_channels=config.emg.hidden_channels,
-                    kernel_size=config.emg.kernel_size,
-                    pool_size=config.emg.pool_size,
-                ),
-                mic=config.mic,
-                fusion_hidden=config.fusion_hidden,
-                dropout=config.dropout,
-                modality=modality,
-                window_samples=window_samples,
+            config = dataclass_replace(
+                config, emg=dataclass_replace(config.emg, in_channels=emg_channels)
             )
         return build_model(config)
     if model_id == "early_fusion_cnn":

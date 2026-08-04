@@ -58,6 +58,7 @@ bruxism-baselines = "bruxism.cli.run_baselines:main"
 bruxism-report = "bruxism.cli.make_paper_artifacts:main"
 bruxism-figures = "bruxism.cli.make_run_figures:main"
 bruxism-benchmark = "bruxism.cli.benchmark_models:main"
+bruxism-screen = "bruxism.cli.screen_filters:main"
 bruxism-summarize = "bruxism.cli.summarize_runs:main"
 bruxism-plot-preprocessing = "bruxism.cli.plot_preprocessing:main"
 

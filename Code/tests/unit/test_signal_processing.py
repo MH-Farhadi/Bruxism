@@ -20,6 +20,8 @@ from bruxism.preprocessing.filters import (
     FilterStage,
     apply_filter_chain,
     design_bandpass,
+    emg_stages,
+    mains_harmonics,
     validate_cutoffs,
 )
 from bruxism.preprocessing.wavelets import (
@@ -98,6 +100,53 @@ def test_filtering_per_window_corrupts_the_window(rng):
     assert error[:50].mean() > 5 * error[200:600].mean()
 
 
+def _band_power(signal: np.ndarray, freq_hz: float, *, half_width_hz: float = 3.0) -> float:
+    """Power within +/- ``half_width_hz`` of ``freq_hz``, from a Welch PSD."""
+    freqs, psd = welch(np.asarray(signal, dtype=np.float64).ravel(), fs=FS, nperseg=4096)
+    band = (freqs >= freq_hz - half_width_hz) & (freqs <= freq_hz + half_width_hz)
+    return float(np.trapezoid(psd[band], freqs[band]))
+
+
+@pytest.mark.parametrize("harmonic_hz", [120.0, 180.0, 240.0, 300.0, 360.0, 420.0])
+def test_production_chain_attenuates_every_mains_harmonic(rng, harmonic_hz):
+    """Every mains harmonic inside the EMG passband must be attenuated by >= 20 dB.
+
+    This is the regression test for the defect diagnosed in ``cause.md``: the acquisition
+    hardware already removed the 60 Hz fundamental (``notch_filter: Index 9`` in every
+    metadata sidecar), so the odd harmonics at 180/300/420 Hz -- measured at 37,000x to
+    846,000x the local noise floor -- were the entire interference, and a chain that
+    notched only 60 Hz passed them straight through. It fails against the pre-2026-08-03
+    ``_default_emg_stages``.
+    """
+    t = np.arange(24_000) / FS
+    broadband = rng.standard_normal(t.size)
+    interference = 50.0 * np.sin(2 * np.pi * harmonic_hz * t)
+    signal = broadband + interference
+
+    filtered = apply_filter_chain(signal, FilterChainConfig(), FS, modality="emg")
+
+    attenuation_db = 10 * np.log10(
+        _band_power(signal, harmonic_hz) / _band_power(filtered, harmonic_hz)
+    )
+    assert attenuation_db >= 20.0, (
+        f"{harmonic_hz:g} Hz attenuated by only {attenuation_db:.1f} dB; the production EMG "
+        f"chain must remove every mains harmonic inside its passband"
+    )
+
+
+def test_production_chain_preserves_emg_between_the_harmonics(rng):
+    """The notch bank must not cost the broadband EMG it is protecting.
+
+    A 90 Hz tone sits midway between two harmonics; it must survive essentially intact, or
+    the cure removes the signal along with the interference.
+    """
+    t = np.arange(24_000) / FS
+    signal = rng.standard_normal(t.size) + 50.0 * np.sin(2 * np.pi * 90.0 * t)
+    filtered = apply_filter_chain(signal, FilterChainConfig(), FS, modality="emg")
+    loss_db = 10 * np.log10(_band_power(signal, 90.0) / _band_power(filtered, 90.0))
+    assert abs(loss_db) < 1.0, f"90 Hz lost {loss_db:.2f} dB; the notches are too wide"
+
+
 def test_zero_phase_is_declared_as_not_supporting_realtime():
     assert FilterChainConfig(zero_phase=True).realtime_claim_supported is False
     assert FilterChainConfig(zero_phase=False).realtime_claim_supported is True
@@ -112,8 +161,124 @@ def test_filter_config_roundtrips():
 def test_default_chain_has_no_redundant_lowfrequency_highpass():
     """The prototype's 5 Hz high-pass after a 20 Hz bandpass was a no-op; it is gone."""
     kinds = [s.kind for s in FilterChainConfig().emg_stages]
-    assert kinds == ["notch", "bandpass"]
+    assert "highpass" not in kinds
+    assert kinds[-1] == "bandpass", "the bandpass runs last, after the mains notches"
     assert all(s.rationale for s in FilterChainConfig().emg_stages)
+
+
+def test_default_chain_notches_every_mains_multiple_in_the_passband():
+    """60, 120, 180, 240, 300, 360, 420 Hz -- not just the fundamental."""
+    stages = FilterChainConfig().emg_stages
+    notched = [s.freq_hz for s in stages if s.kind == "notch"]
+    assert notched == [60.0, 120.0, 180.0, 240.0, 300.0, 360.0, 420.0]
+    bandpass = next(s for s in stages if s.kind == "bandpass")
+    assert (bandpass.low_hz, bandpass.high_hz) == (20.0, 450.0)
+    # 480 Hz is a mains multiple but sits above the passband, so it is not notched.
+    assert 480.0 not in notched
+
+
+def test_mains_harmonics_enumeration():
+    assert mains_harmonics(60.0, 1200.0, low_hz=20.0, high_hz=450.0) == (
+        60.0,
+        120.0,
+        180.0,
+        240.0,
+        300.0,
+        360.0,
+        420.0,
+    )
+    # Nyquist bounds the list even when no upper edge is given.
+    assert mains_harmonics(60.0, 1200.0)[-1] == 540.0
+    # A 50 Hz supply is expressible without touching code.
+    assert mains_harmonics(50.0, 1200.0, low_hz=20.0, high_hz=450.0)[:3] == (50.0, 100.0, 150.0)
+
+
+def test_notches_are_constant_width_not_constant_q():
+    """All seven notches are equally wide in Hz, because the interference spread is.
+
+    Constant Q would give 2 Hz at 60 Hz and 14 Hz at 420 Hz -- narrowest exactly where the
+    hardware notch left a residue, widest where nothing survives.
+    """
+    notches = [s for s in FilterChainConfig().emg_stages if s.kind == "notch"]
+    widths = [s.freq_hz / s.quality for s in notches]
+    assert all(width == pytest.approx(widths[0]) for width in widths)
+    assert widths[0] == pytest.approx(8.0)
+
+    constant_q = [s for s in emg_stages(notch_bandwidth_hz=None, quality=30.0) if s.kind == "notch"]
+    q_widths = [s.freq_hz / s.quality for s in constant_q]
+    assert q_widths[0] == pytest.approx(2.0) and q_widths[-1] == pytest.approx(14.0)
+
+
+def test_wide_fundamental_notch_still_leaves_the_emg_band_usable():
+    """An 8 Hz notch at 60 Hz must not swallow the EMG either side of it."""
+    t = np.arange(24_000) / FS
+    for tone_hz in (45.0, 80.0):
+        signal = rng_signal(t) + 50.0 * np.sin(2 * np.pi * tone_hz * t)
+        filtered = apply_filter_chain(signal, FilterChainConfig(), FS, modality="emg")
+        loss_db = 10 * np.log10(_band_power(signal, tone_hz) / _band_power(filtered, tone_hz))
+        assert abs(loss_db) < 1.0, f"{tone_hz:g} Hz lost {loss_db:.2f} dB"
+
+
+def rng_signal(t: np.ndarray) -> np.ndarray:
+    """Deterministic broadband carrier for the notch-width tests."""
+    return np.random.default_rng(0).standard_normal(t.size)
+
+
+def test_the_superseded_single_notch_chain_is_still_expressible():
+    """The pre-2026-08-03 chain must remain configurable, for regression comparisons."""
+    stages = emg_stages(notch_harmonics=False)
+    assert [s.freq_hz for s in stages if s.kind == "notch"] == [60.0]
+
+
+@pytest.mark.parametrize("variant", ["notch_bank", "comb", "spectral_interpolation"])
+def test_every_mains_removal_variant_suppresses_180hz(rng, variant):
+    """The three candidate strategies are interchangeable at the interface."""
+    t = np.arange(24_000) / FS
+    signal = rng.standard_normal(t.size) + 50.0 * np.sin(2 * np.pi * 180.0 * t)
+    bandpass = FilterStage(kind="bandpass", low_hz=20.0, high_hz=450.0, order=4, rationale="test")
+    if variant == "notch_bank":
+        stages = tuple(emg_stages())
+    elif variant == "comb":
+        stages = (
+            FilterStage(kind="comb", freq_hz=60.0, quality=30.0, rationale="test"),
+            bandpass,
+        )
+    else:
+        stages = (
+            FilterStage(
+                kind="spectral_interpolation",
+                freq_hz=60.0,
+                low_hz=20.0,
+                high_hz=450.0,
+                half_width_hz=1.5,
+                rationale="test",
+            ),
+            bandpass,
+        )
+    config = FilterChainConfig(emg_stages=stages, mic_stages=())
+    filtered = apply_filter_chain(signal, config, FS, modality="emg")
+    attenuation_db = 10 * np.log10(_band_power(signal, 180.0) / _band_power(filtered, 180.0))
+    assert attenuation_db >= 20.0, f"{variant} attenuated 180 Hz by only {attenuation_db:.1f} dB"
+
+
+def test_spectral_interpolation_is_declared_acausal_even_without_zero_phase():
+    """It reads the whole recording, so no lfilter setting makes it streamable."""
+    stage = FilterStage(
+        kind="spectral_interpolation", freq_hz=60.0, low_hz=20.0, high_hz=450.0, rationale="t"
+    )
+    config = FilterChainConfig(emg_stages=(stage,), mic_stages=(), zero_phase=False)
+    assert config.is_causal is False
+    assert config.realtime_claim_supported is False
+
+
+def test_spectral_interpolation_refuses_a_single_window():
+    """A 1 s window resolves 1 Hz, too coarse to isolate a +/-1.5 Hz band."""
+    stage = FilterStage(
+        kind="spectral_interpolation", freq_hz=60.0, low_hz=20.0, high_hz=450.0, rationale="t"
+    )
+    config = FilterChainConfig(emg_stages=(stage,), mic_stages=())
+    with pytest.raises(FilterDesignError, match="continuous recording"):
+        apply_filter_chain(np.zeros(1200), config, FS, modality="emg")
 
 
 # ------------------------------------------------------------------ wavelets ---

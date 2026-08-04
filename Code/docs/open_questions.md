@@ -51,6 +51,48 @@ Measured (`outputs/data_audit/<hash>/guard_sensitivity.csv`):
 participant × class cell. **This needs investigator sign-off.** It is one line in
 `configs/data/trigger_constrained.yaml` and in every experiment config.
 
+### 2026-08-03: the guard is now measured, not assumed
+
+The table above answers "how much data does the guard cost?" It never answered the question
+the guard exists for: **how far is the trigger mark from the actual condition change?**
+`evaluation/segmentation.py::trigger_onset_alignment` measures it, by timing when the EMG
+envelope actually crosses the midpoint between its pre-onset and post-onset plateaus.
+
+On 432 trigger onsets (358 with a detectable activation; 17 % show none):
+
+| quantity | value |
+|---|---:|
+| median lag (trigger → envelope) | **−0.075 s** |
+| onsets where activity **precedes** the trigger | **79.9 %** |
+| onsets where activity **follows** the trigger (the harmful direction) | 71 / 358 = 19.8 % |
+| median positive lag | 0.054 s |
+| p95 positive lag | 0.282 s |
+| max positive lag | 0.352 s |
+
+**Interpretation.** The trigger is not a precise onset marker, but it errs in the benign
+direction: four times out of five the muscle is already active when the mark goes high, so a
+window placed just inside the trigger contains task activity and its label is correct. The
+guard only protects against the other 20 %, whose median error is 54 ms.
+
+**What that buys.** From the window/guard sweep
+(`outputs/data_audit/<hash>/window_guard_sweep.csv`), at a 1.0 s window:
+
+| guard (s) | total windows | smallest cell | cells < 30 | S02 movement |
+|---:|---:|---:|---:|---:|
+| 0.10 | 6,525 | **36** | **0** | 36 |
+| 0.15 | 6,402 | 27 | 1 | 27 |
+| 0.25 (current) | 6,173 | 11 | 1 | 11 |
+
+Reducing the guard from 0.25 s to 0.10 s removes every starved participant × class cell
+**without shortening the window**, at the cost of exposing roughly 7 % of first-windows-per-run
+to a partially mislabelled leading edge (20 % of onsets are harmful × ~35 % of those exceed
+0.10 s). The 0.5 s guard originally proposed exceeds the largest positive lag ever measured
+(0.352 s) and is not supported by the data.
+
+**Recommendation for sign-off:** 1.0 s window, **0.10 s guard**. Prespecified as
+`configs/experiments/five_class_guard010.yaml`; the 0.25 s configuration remains the
+primary reported one until sign-off, so the two are comparable.
+
 **Blocks.** The Methods sentence describing transition exclusion, and every sample count in
 the manuscript.
 
@@ -155,11 +197,53 @@ real deployment where rest dominates. The manuscript must state this limitation.
 
 ---
 
-## Q9 — Signal preparation ⛔ BLOCKING (see Q3)
+## Q9 — Signal preparation ⚠️ HALF-ANSWERED FROM THE DATA (2026-08-03), remainder blocking
 
-Whether hardware filters were active, and what `Index 143` / `Index 9` refer to. Until
-answered, the offline chain is documented as "applied on top of unknown acquisition-side
-filtering".
+**Question.** Whether hardware filters were active, and what `bandpass_filter: Index 143` /
+`notch_filter: Index 9` refer to.
+
+### Answered by the spectra: `notch_filter: Index 9` removed 60 Hz, and nothing else
+
+Measured on the **raw** recordings, peak-to-local-noise-floor ratio in the 20–450 Hz band:
+
+| Frequency | S01 rest | S02 rest |
+|---|---:|---:|
+| 60 Hz  | 2× | 2× |
+| 180 Hz | 571× | **1,781,427×** |
+| 300 Hz | 119× | 412,502× |
+| 420 Hz | 43× | 52,690× |
+
+The mains fundamental is absent from data that is otherwise dominated by its own harmonics.
+Nothing but an acquisition-side notch explains that, so `notch_filter: Index 9` is a 60 Hz
+notch and it was active on every recording.
+
+**This was not a harmless curiosity.** The offline chain notched 60 Hz — the one mains
+frequency already gone — and band-passed 20–450 Hz, letting 180/300/420 Hz through. Across
+all 100 recordings, 62 have more than 30 % of their raw in-band EMG power at mains
+harmonics; every rest recording is between 91 % and 99.8 %. Corrected on 2026-08-03: the
+chain now notches every mains multiple inside the passband. See `cause.md`, `opus_report_1.md`
+and `preprocessing/filters.py`.
+
+**Methodological point worth stating in the manuscript.** The textbook chain — notch the
+mains fundamental, then band-pass — is *actively misleading* on hardware that already
+notches: it removes nothing and leaves the harmonics, while looking correct in a filter
+diagram. `04_filter_response` now plots the measured data spectrum behind the filter
+response so the mismatch is visible rather than inferable.
+
+### Still blocking
+
+1. **Confirm the hardware notch** from the acquisition software's index table, rather than
+   from our inference. The spectra are unambiguous but they are an inference.
+2. **What is `bandpass_filter: Index 143`?** If the hardware already band-limits, the
+   offline 20–450 Hz bandpass may be redundant, and the manuscript should say which stage
+   shaped the band. The recordings show no obvious roll-off below 450 Hz, so if a hardware
+   bandpass was active its upper edge is at or above ours — but that is a weaker inference
+   than the notch and it is not recorded as answered.
+3. **Was the notch setting identical for every participant and session?** All five show the
+   same 60 Hz absence, which is consistent with a fixed setting, but it is unconfirmed.
+
+**Asked of the investigators:** the acquisition software's filter index table, and
+confirmation that both settings were unchanged across all sessions.
 
 ---
 
@@ -199,7 +283,7 @@ verification is a separate scholarly task and was not performed here.
 | ID | Topic | Status | Blocks |
 |---|---|---|---|
 | Q1 | Trigger semantics | RESOLVED | — |
-| Q1b | Transition guard width | BLOCKING | Methods, all sample counts |
+| Q1b | Transition guard width | MEASURED 2026-08-03 (onset alignment); needs sign-off | Methods, all sample counts |
 | Q2 | Channel montage | RESOLVED (partial) | electrode detail only |
 | Q3 | Hardware / units / filters | BLOCKING | Methods, axis labels |
 | Q4 | Population and phenotype | BLOCKING | Participants, phenotype |
@@ -207,7 +291,7 @@ verification is a separate scholarly task and was not performed here.
 | Q6 | Task naming | OPEN | wording only |
 | Q7 | S05 metadata conflict | RESOLVED | — |
 | Q8 | Rest definition | RESOLVED | — |
-| Q9 | Acquisition filtering | BLOCKING | Methods |
+| Q9 | Acquisition filtering | HALF-ANSWERED (notch confirmed from spectra 2026-08-03; bandpass index still open) | Methods |
 | Q10 | IRB identifier | BLOCKING | Ethics statement |
 | Q11 | Release authorisation | BLOCKING | Data availability |
 | Q12 | Venue and citations | OPEN | formatting |

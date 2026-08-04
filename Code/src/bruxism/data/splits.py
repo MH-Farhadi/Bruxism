@@ -200,6 +200,12 @@ class NestedLOSOSplitter:
         Source of examples. Only its ``subject_id`` and ``sample_id`` fields are used.
     subjects
         Restrict to these participants (default: all present in ``window_index``).
+    exclude_sample_ids
+        Windows withheld from **every** split. Used for the per-participant calibration
+        block: a window that set a participant's normalisation scale must not also be
+        trained on or scored, or the calibrated arm would be flattered for a reason that
+        has nothing to do with calibration working. Excluding here rather than in the
+        trainer means no split can reach them at all.
 
     Raises
     ------
@@ -208,11 +214,26 @@ class NestedLOSOSplitter:
         fewer than two training participants and inner LOSO would be degenerate.
     """
 
-    def __init__(self, window_index: WindowIndex, *, subjects: Sequence[str] | None = None):
+    def __init__(
+        self,
+        window_index: WindowIndex,
+        *,
+        subjects: Sequence[str] | None = None,
+        exclude_sample_ids: Sequence[str] | frozenset[str] = (),
+    ):
         self._index = window_index
+        self.excluded_sample_ids: frozenset[str] = frozenset(exclude_sample_ids)
         by_subject: dict[str, list[str]] = {}
         for window in window_index.windows:
+            if window.sample_id in self.excluded_sample_ids:
+                continue
             by_subject.setdefault(window.subject_id, []).append(window.sample_id)
+        if self.excluded_sample_ids:
+            logger.info(
+                "withholding %d calibration window(s) from every split",
+                len(self.excluded_sample_ids),
+                extra={"n_excluded": len(self.excluded_sample_ids)},
+            )
         self._by_subject = {
             subject: tuple(sorted(ids)) for subject, ids in sorted(by_subject.items())
         }
@@ -279,6 +300,7 @@ class NestedLOSOSplitter:
             "subjects": list(self.subjects),
             "n_outer_folds": self.n_outer_folds,
             "n_inner_folds_per_outer": self.n_inner_folds(),
+            "n_windows_withheld_for_calibration": len(self.excluded_sample_ids),
             "window_index_hash": self._index.index_hash,
             "segmentation_policy": str(self._index.config.policy),
             "safe_for_inference": self._index.safe_for_inference,

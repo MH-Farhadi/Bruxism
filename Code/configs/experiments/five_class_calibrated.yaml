@@ -1,19 +1,14 @@
-# Architecture comparison with matched inputs.
+# PRIMARY ENDPOINT: five-class classification of instructed awake jaw / tooth-contact tasks.
 #
-#   bruxism-baselines --config configs/experiments/baselines.yaml
+#   bruxism-train --config configs/experiments/five_class_nested_loso.yaml
 #
-# Every model receives the SAME EMG + audio pair. A table in which the proposed model gets
-# fusion and the baselines get EMG only measures fusion, not architecture.
-name: baselines
-description: Dual-branch (original and temporal) vs early-fusion CNN vs BiLSTM, identical inputs.
+# Outer leave-one-subject-out over all five participants; four participant-grouped inner
+# folds per outer fold (four training participants remain, so four folds -- never five).
+name: five_class_calibrated
+description: Phase 3 - primary endpoint plus a declared per-participant calibration block.
 task_id: five_class
 model_id: dual_branch_wavelet_cnn
 modality: fusion
-# dual_branch_temporal_cnn is the Phase 5 architecture: identical wavelet front end, but
-# mean/std/max pooling per band plus a modulation-spectrum head, so burst-relax rhythm is
-# representable at all. The superseded dual_branch_wavelet_cnn stays in the sweep - the
-# comparison is the point, and cause.md 4 is what it looks like when the baseline wins.
-sweep_model_ids: [dual_branch_wavelet_cnn, dual_branch_temporal_cnn, early_fusion_cnn, bilstm]
 
 data:
   data_root: ../Data
@@ -51,8 +46,18 @@ filters:
        rationale: "Remove the large DC offset; no further shaping, the transducer response is undocumented."}
 
 normalization:
-  scope: per_channel
-  method: zscore
+  # TRANSDUCTIVE PROTOCOL. Each participant is standardised by their own statistics,
+  # computed from a calibration block of their own UNLABELLED signal - the dedicated rest
+  # recording plus one guided repetition of each task family. That block is withheld from
+  # training AND evaluation, and <run_dir>/calibration_block.json records exactly which
+  # windows produced each participant's statistics.
+  #
+  # Results from this config REQUIRE A FITTING SESSION and are not comparable to the
+  # strict arm (five_class_nested_loso.yaml), which is the number that supports a
+  # no-calibration deployment claim. Report both. See docs/experiment_protocol.md 5.1.
+  scope: per_participant
+  method: zscore                       # robust/MAD measured worse: 0.409 vs 0.527
+  calibration: rest_plus_one_repetition
 
 augmentation:
   enabled: true
@@ -73,16 +78,22 @@ selection:
 training:
   batch_size: 64
   learning_rate: 0.001
+  weight_decay: 0.0001
   optimizer: adamw
   loss: focal
   focal_gamma: 1.5
   class_weight_scheme: balanced
+  grad_clip_norm: 1.0
   num_workers: 0
   device: auto
   deterministic: true
   seeds: [0, 1, 2]
-  search_space: {}
+  # Searched on INNER folds only. Whether focal loss is kept is decided here, not assumed.
+  search_space:
+    learning_rate: [0.0003, 0.001]
+    loss: [focal, cross_entropy]
 
 output:
   runs_root: outputs/runs
   save_checkpoints: true
+  save_embeddings: true

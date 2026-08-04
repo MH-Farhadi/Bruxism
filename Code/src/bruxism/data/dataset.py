@@ -336,8 +336,11 @@ class WindowDataset(Dataset):
             )
 
         if self.normalizer is not None:
-            emg = self.normalizer.transform_emg(emg)
-            mic = self.normalizer.transform_mic(mic)
+            # The subject is passed so a per-participant normalizer can apply that
+            # participant's own statistics; every other scope ignores it.
+            subject = example.window.subject_id
+            emg = self.normalizer.transform_emg(emg, subject=subject)
+            mic = self.normalizer.transform_mic(mic, subject=subject)
 
         emg_tensor = torch.from_numpy(np.ascontiguousarray(emg.T, dtype=np.float32))
         mic_tensor = torch.from_numpy(np.ascontiguousarray(mic[None, :], dtype=np.float32))

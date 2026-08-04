@@ -244,3 +244,108 @@ def test_curve_points_are_thinned_but_auc_is_not():
     assert curves["a"]["roc_auc"] == pytest.approx(
         roc_auc_score((y_true == 0).astype(int), probabilities[:, 0])
     )
+
+
+# ------------------------------------------------------------- calibration ---
+
+
+def test_temperature_scaling_cannot_change_any_ranking_metric(rng):
+    """Temperature is monotone: accuracy, macro-F1 and AUC are unchanged by construction."""
+    from bruxism.evaluation.calibration import apply_temperature
+
+    logits = rng.standard_normal((500, 5))
+    probabilities = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    for temperature in (0.5, 1.0, 2.0, 7.5):
+        scaled = apply_temperature(probabilities, temperature)
+        assert np.allclose(scaled.sum(axis=1), 1.0)
+        assert np.array_equal(scaled.argmax(axis=1), probabilities.argmax(axis=1))
+
+
+def test_fitted_temperature_reduces_expected_calibration_error(rng):
+    """An overconfident model is repaired; the fit is a single scalar."""
+    from bruxism.evaluation.calibration import TemperatureScaler, apply_temperature
+
+    labels = rng.integers(0, 4, size=2000)
+    logits = rng.standard_normal((2000, 4))
+    logits[np.arange(2000), labels] += 1.2
+    honest = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    overconfident = apply_temperature(honest, 0.25)
+
+    scaler = TemperatureScaler.fit(overconfident, labels, subjects=("S01", "S02"))
+    report = scaler.report(overconfident, labels)
+    assert report["ece_calibrated"] < report["ece_uncalibrated"] / 2
+    assert report["predictions_unchanged"] is True
+    assert scaler.temperature > 1.0, "an overconfident model needs softening"
+
+
+def test_temperature_refuses_to_be_applied_to_the_participant_it_saw():
+    from bruxism.evaluation.calibration import TemperatureScaler
+
+    scaler = TemperatureScaler(temperature=1.4, fitted_on=("S02", "S03"))
+    scaler.assert_not_fitted_on(["S01"])
+    with pytest.raises(AssertionError, match="fitted on participant"):
+        scaler.assert_not_fitted_on(["S02"])
+
+
+def test_uncalibrated_summary_states_auc_is_unaffected(rng):
+    from bruxism.evaluation.calibration import summarise_uncalibrated
+
+    labels = rng.integers(0, 3, size=300)
+    logits = rng.standard_normal((300, 3))
+    probabilities = np.exp(logits) / np.exp(logits).sum(axis=1, keepdims=True)
+    summary = summarise_uncalibrated(probabilities, labels)
+    assert summary["calibrated"] is False
+    assert "rank-based" in summary["statement"]
+
+
+# --------------------------------------------------------------- screening ---
+
+
+def test_screening_features_are_named_ordered_and_thirty_five():
+    from bruxism.evaluation.screening import screening_feature_names
+
+    names = screening_feature_names(4)
+    assert len(names) == 35, "20 EMG band log-RMS + 4 waveform length + 4 ZCR + 6 mic + 1 mic RMS"
+    assert len(set(names)) == len(names)
+    assert names[0] == "emg1_log_rms_A4"
+    assert names[-1] == "mic_log_rms"
+
+
+def test_per_recording_normalisation_destroys_the_label(rng):
+    """Each recording holds one condition, so per-recording scaling removes the class.
+
+    This is the measurement that rules the scope out (cause.md 3: macro-F1 0.036, and
+    0.036 again when re-measured on the corrected chain). It is a test because the option
+    remains reachable from configuration.
+    """
+    from bruxism.evaluation.screening import _standardise_within
+
+    features = rng.standard_normal((90, 4))
+    recordings = np.repeat(["r1", "r2", "r3"], 30)
+    # Give each recording a distinct offset -- the between-class signal.
+    for index, name in enumerate(("r1", "r2", "r3")):
+        features[recordings == name] += index * 10.0
+
+    scaled = _standardise_within(features, recordings, robust=False)
+    for name in ("r1", "r2", "r3"):
+        block = scaled[recordings == name]
+        assert abs(block.mean()) < 1e-8, "the offset that carried the label is gone"
+
+
+def test_aggregation_labels_itself_trial_level():
+    """The label must travel with the number, not sit only in a docstring."""
+    from bruxism.evaluation.screening import aggregate_within_recording
+
+    frame = pd.DataFrame(
+        {
+            "recording_id": ["r1"] * 8,
+            "start_sample": np.arange(8) * 600,
+            "subject_id": ["S01"] * 8,
+            "true_label": [1] * 8,
+            "prob_a": [0.4] * 8,
+            "prob_b": [0.6] * 8,
+        }
+    )
+    result = aggregate_within_recording(frame, ("a", "b"), n_windows=4)
+    assert "TRIAL-LEVEL" in result["interpretation"]
+    assert result["per_subject"]["S01"]["n_blocks"] == 2

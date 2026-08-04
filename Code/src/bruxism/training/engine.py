@@ -44,6 +44,7 @@ from bruxism.evaluation.metrics import LEDGER_COLUMNS
 from bruxism.models import BruxismModel
 from bruxism.models.baselines import build_neural_model
 from bruxism.preprocessing.augmentation import Augmenter
+from bruxism.preprocessing.calibration import CalibrationBlock
 from bruxism.preprocessing.normalization import Normalizer
 from bruxism.training.losses import build_loss, compute_class_weights
 from bruxism.training.selection import (
@@ -126,6 +127,7 @@ class NestedLOSOTrainer:
         manifest_hash: str,
         model_id: str | None = None,
         modality: str | None = None,
+        calibration_block: CalibrationBlock | None = None,
     ):
         self.config = config
         self.window_index = window_index
@@ -138,6 +140,21 @@ class NestedLOSOTrainer:
         self.modality = modality or config.modality
         self.device = resolve_device(config.training.device)
         self.selection = config.selection
+        self.calibration_block = calibration_block
+
+        if config.normalization.scope == "per_participant":
+            if calibration_block is None:
+                raise ValueError(
+                    "normalization.scope='per_participant' requires a calibration block; "
+                    "bruxism.runner builds one and passes it in"
+                )
+            logger.warning(
+                "TRANSDUCTIVE PROTOCOL: per-participant normalisation uses each "
+                "participant's own unlabelled calibration block (%s), including the "
+                "held-out participant. Results from this run require a fitting session "
+                "and are NOT comparable to the strict, training-set-only arm.",
+                calibration_block.source,
+            )
 
         if not window_index.safe_for_inference:
             logger.warning(
@@ -165,12 +182,52 @@ class NestedLOSOTrainer:
             pin_memory=self.device.type == "cuda",
         )
 
-    def _fit_normalizer(self, sample_ids: Sequence[str], subjects: Sequence[str]) -> Normalizer:
-        """Fit normalisation statistics on the given (training-only) sample ids."""
+    def _fit_normalizer(
+        self,
+        sample_ids: Sequence[str],
+        subjects: Sequence[str],
+        *,
+        calibrate_subjects: Sequence[str] = (),
+    ) -> Normalizer:
+        """Fit normalisation statistics on the given (training-only) sample ids.
+
+        Parameters
+        ----------
+        calibrate_subjects
+            Participants to additionally calibrate from their own calibration block, when
+            ``normalization.scope`` is ``"per_participant"``. This is where the held-out
+            participant's *unlabelled* signal legitimately enters; the block itself was
+            withheld from every split by the splitter, and the run bundle records which
+            windows produced each participant's statistics.
+        """
         wanted = set(sample_ids)
         windows = [w for w in self.window_index.windows if w.sample_id in wanted]
         emg, mic = self.cache.training_statistics_source(windows)
-        return Normalizer(self.config.normalization).fit(emg, mic, subjects=tuple(subjects))
+        normalizer = Normalizer(self.config.normalization).fit(emg, mic, subjects=tuple(subjects))
+
+        if self.config.normalization.scope != "per_participant":
+            return normalizer
+        block = self.calibration_block
+        if block is None:
+            raise ValueError(
+                "normalization.scope='per_participant' but no calibration block was built; "
+                "the trainer must be constructed with one"
+            )
+        for subject in sorted({*subjects, *calibrate_subjects}):
+            ids = set(block.for_subject(subject))
+            if not ids:
+                logger.warning(
+                    "participant %s has no calibration block; falling back to the pooled "
+                    "training statistics for them",
+                    subject,
+                )
+                continue
+            block_windows = [w for w in self.window_index.windows if w.sample_id in ids]
+            block_emg, block_mic = self.cache.training_statistics_source(
+                block_windows, max_windows=None
+            )
+            normalizer.calibrate(subject, block_emg, block_mic, sample_ids=tuple(sorted(ids)))
+        return normalizer
 
     def _build_model(self) -> BruxismModel:
         model = build_neural_model(
@@ -512,9 +569,17 @@ class NestedLOSOTrainer:
                         fit_started = time.perf_counter()
 
                         normalizer = self._fit_normalizer(
-                            inner.train_sample_ids, inner.train_subjects
+                            inner.train_sample_ids,
+                            inner.train_subjects,
+                            # The inner validation participant is calibrated so selection
+                            # sees the same protocol the final evaluation will. The outer
+                            # test participant is NOT: the seal covers their signal too.
+                            calibrate_subjects=[inner.val_subject],
                         )
                         normalizer.assert_not_fitted_on([fold.test_subject, inner.val_subject])
+                        normalizer.assert_calibration_disjoint_from(
+                            [*inner.train_sample_ids, *inner.val_sample_ids]
+                        )
                         train_dataset, val_dataset = self._make_datasets(
                             inner.train_sample_ids,
                             inner.val_sample_ids,
@@ -631,10 +696,19 @@ class NestedLOSOTrainer:
         training = self.config.training.replace(**best_trial.hyperparameters)
 
         # Final refit on ALL outer-training participants for the fixed epoch budget.
-        normalizer = self._fit_normalizer(fold.train_sample_ids, fold.train_subjects)
+        normalizer = self._fit_normalizer(
+            fold.train_sample_ids,
+            fold.train_subjects,
+            calibrate_subjects=[fold.test_subject],
+        )
+        # Unchanged meaning: the held-out participant contributed no LABELLED training
+        # window to the pooled statistics. Their unlabelled calibration block may have
+        # contributed to their own per-participant statistics, which is recorded
+        # separately in normalizer.calibrated_on and disclosed in the run bundle.
         normalizer.assert_not_fitted_on([fold.test_subject])
 
         test_ids = fold.release_test_ids(purpose="final_evaluation")
+        normalizer.assert_calibration_disjoint_from([*fold.train_sample_ids, *test_ids])
         train_dataset, test_dataset = self._make_datasets(
             fold.train_sample_ids,
             test_ids,
@@ -833,11 +907,21 @@ class NestedLOSOTrainer:
         self, *, seeds: Sequence[int] | None = None
     ) -> Iterator[tuple[FoldOutcome, pd.DataFrame]]:
         """Iterate every (outer fold, seed) pair, yielding results as they complete."""
-        splitter = NestedLOSOSplitter(self.window_index, subjects=self.config.data.subjects)
+        splitter = self._splitter()
         for seed in seeds if seeds is not None else self.config.training.seeds:
             for fold in splitter.outer_folds():
                 yield self.run_fold(fold, seed)
 
+    def _splitter(self) -> NestedLOSOSplitter:
+        """Splitter with the calibration block withheld from every fold, if there is one."""
+        return NestedLOSOSplitter(
+            self.window_index,
+            subjects=self.config.data.subjects,
+            exclude_sample_ids=(
+                self.calibration_block.all_sample_ids if self.calibration_block else frozenset()
+            ),
+        )
+
     def split_plan(self) -> dict[str, Any]:
         """The fold plan, written to ``folds.json`` before any training starts."""
-        return NestedLOSOSplitter(self.window_index, subjects=self.config.data.subjects).to_dict()
+        return self._splitter().to_dict()

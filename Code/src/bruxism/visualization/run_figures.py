@@ -678,7 +678,10 @@ def generate_run_figures(
         builder.run(
             "04_filter_response",
             lambda: signal_figures.plot_filter_response(
-                config.filters, float(config.data.sampling_rate_hz), figures_dir
+                config.filters,
+                float(config.data.sampling_rate_hz),
+                figures_dir,
+                manifest=manifest,
             ),
         )
         builder.run(

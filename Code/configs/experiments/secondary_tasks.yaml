@@ -25,14 +25,23 @@ data:
   cache_dir: outputs/cache
 
 filters:
-  # 60 Hz notch then a 20-450 Hz bandpass. The prototype's extra 5 Hz high-pass is a no-op
-  # after a 20 Hz bandpass edge and was removed rather than carried forward.
+  # SUPERSEDES the 2026-07 chain, which notched 60 Hz and band-passed 20-450 Hz.
+  #
+  # The acquisition hardware had ALREADY removed 60 Hz (`notch_filter: Index 9` in every
+  # metadata sidecar), so that notch removed the one mains frequency that was not there
+  # while 180/300/420 Hz -- 37,000x to 846,000x above the local noise floor -- passed
+  # straight through and made up 85-99 % of the in-band power of the "filtered" signal.
+  # See cause.md and docs/open_questions.md Q9. `emg_mains` expands to one notch per mains
+  # multiple inside the passband (60, 120, 180, 240, 300, 360, 420 Hz) plus the bandpass;
+  # resolved_config.yaml in every run bundle records the expansion.
+  #
+  # Results produced with this chain are NOT comparable to any result produced before it.
   zero_phase: true          # filtfilt: ACAUSAL / OFFLINE. Not a real-time chain.
-  emg_stages:
-    - {kind: notch, freq_hz: 60.0, quality: 30.0,
-       rationale: "Suppress North American mains interference at 60 Hz."}
-    - {kind: bandpass, low_hz: 20.0, high_hz: 450.0, order: 4,
-       rationale: "Standard surface-EMG band, below the 600 Hz Nyquist frequency."}
+  emg_mains:
+    mains_hz: 60.0
+    notch_harmonics: true   # false reproduces the superseded chain, for regression checks
+    quality: 30.0
+    band_hz: [20.0, 450.0]
   mic_stages:
     - {kind: highpass, freq_hz: 20.0, order: 2,
        rationale: "Remove the large DC offset; no further shaping, the transducer response is undocumented."}
