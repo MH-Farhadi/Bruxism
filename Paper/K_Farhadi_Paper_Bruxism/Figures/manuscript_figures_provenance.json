@@ -1,0 +1,23 @@
+{
+  "run_id": "five_class_nested_loso_20260807T211827_2b6fb5ac",
+  "config_hash": "2b6fb5ac4f2da926",
+  "manifest_hash": "7ebbcc8d74c0bbe0",
+  "window_index_hash": "b2cf690c6f7ceec6",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "n_predictions": 18519,
+  "figure_seed": 0,
+  "figures": [
+    "confmatrx_5class",
+    "five_class_roc_curves",
+    "five_class_pr_curves",
+    "five_class_per_participant",
+    "sample_flow",
+    "training_curves_5class",
+    "tsne_5class"
+  ],
+  "note": "The confusion, ROC and precision-recall panels depict one trained model per fold at the lowest seed index -- a fixed rule, not a choice made after seeing the scores -- because a curve drawn over pooled seeds would mix models. The per-participant figure shows all seeds: bar heights are seed means and the markers are the individual seeds. The t-SNE uses one seed's checkpoints so each held-out window appears exactly once."
+}
