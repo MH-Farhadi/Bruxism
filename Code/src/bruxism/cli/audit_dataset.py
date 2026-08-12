@@ -177,6 +177,81 @@ def _mains_contamination(frame: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _mic_integrity(frame: pd.DataFrame, manifest: Any) -> dict[str, Any]:
+    """The same audit as :func:`_mains_contamination`, on the channel it was never run on.
+
+    The mains audit was built for the EMG columns after ``cause.md``, and stopped there.
+    Applying the equivalent scrutiny to the microphone column found a different defect:
+    the channel is duplicated across participants, unaligned with the EMG, and reduced to
+    the quantisation floor by its own filter chain. See ``audio.md``.
+
+    The EMG and trigger duplication counts are reported alongside deliberately. They are
+    the control: the microphone number only means something next to a channel that is
+    clean, and if an EMG count ever moves off zero the reader must see it here.
+    """
+    duplication = manifest.duplication or {}
+    mic = duplication.get("mic", {})
+    flags = {
+        flag: int(frame["quality_flags"].str.contains(flag.value, na=False).sum())
+        for flag in (
+            QualityFlag.MIC_WAVEFORM_DUPLICATED,
+            QualityFlag.MIC_EMG_UNALIGNED,
+            QualityFlag.MIC_AT_QUANTISATION_FLOOR,
+            QualityFlag.MIC_BANDWIDTH_IMPLAUSIBLE,
+            QualityFlag.MIC_CHANNEL_DEAD,
+        )
+    }
+    unaligned = frame[frame["quality_flags"].str.contains(QualityFlag.MIC_EMG_UNALIGNED.value)]
+    return {
+        "measured_on": "raw signal; retained-variance and SNR against the configured chain",
+        "chain": (str(frame["mic_chain_description"].iloc[0]) if not frame.empty else "unknown"),
+        "policy_version": (
+            str(frame["mic_integrity_policy_version"].iloc[0]) if not frame.empty else "unknown"
+        ),
+        "n_recordings": int(len(frame)),
+        "distinct_waveforms": {
+            "mic": mic.get("n_distinct_waveforms"),
+            **{
+                channel: duplication[channel]["n_distinct_waveforms"]
+                for channel in sorted(duplication)
+                if channel.startswith("emg")
+            },
+            "trigger": duplication.get("trigger", {}).get("n_distinct_waveforms"),
+        },
+        "cross_subject_groups": {
+            channel: duplication[channel]["n_cross_subject_groups"]
+            for channel in sorted(duplication)
+        },
+        "n_recordings_with_duplicated_mic": mic.get("n_recordings_affected", 0),
+        "duplicated_mic_per_subject": (
+            frame[frame["mic_duplicate_group"].astype(str) != ""]
+            .groupby("subject_id", observed=True)
+            .size()
+            .to_dict()
+        ),
+        "mic_duplicate_groups": mic.get("groups", {}),
+        "quantisation_step_counts": sorted(
+            {float(v) for v in frame["mic_quantisation_step"].dropna()}
+        ),
+        "median_power_fraction_below_10hz": float(frame["mic_power_fraction_below_10hz"].median()),
+        "median_variance_retained_fraction": float(
+            frame["mic_variance_retained_fraction"].median()
+        ),
+        "median_snr_above_quantisation_db": float(
+            frame["mic_snr_above_quantisation_db"].replace([float("-inf")], float("nan")).median()
+        ),
+        "alignment": {
+            "n_evaluated": int((~frame["mic_emg_envelope_r_at_zero"].isna()).sum()),
+            "median_r_at_zero": float(frame["mic_emg_envelope_r_at_zero"].median()),
+            "median_abs_lag_seconds": float(frame["mic_emg_envelope_lag_seconds"].abs().median()),
+            "n_unaligned_where_sound_expected": int(len(unaligned)),
+        },
+        "flags_raised": {flag.value: count for flag, count in flags.items()},
+        "audio_blocked_recordings": len(manifest.audio_blocking_flags()),
+        "policy": {flag.value: describe_flag(flag) for flag in flags},
+    }
+
+
 def _trigger_summary(frame: pd.DataFrame) -> pd.DataFrame:
     grouped = frame.groupby("condition", observed=True).agg(
         n_recordings=("recording_id", "size"),
@@ -392,6 +467,7 @@ def main_impl(args: argparse.Namespace) -> int:
         "window_guard_sweep": sweep.to_dict("records"),
         "trigger_onset_alignment": onset_alignment,
         "mains_contamination": _mains_contamination(frame),
+        "mic_integrity": _mic_integrity(frame, manifest),
         "historical_confusion_matrix_check": _historical_check(legacy_index),
     }
 
@@ -426,6 +502,28 @@ def main_impl(args: argparse.Namespace) -> int:
                 "mains_harmonic_breakdown",
             ]
         ].sort_values("mains_harmonic_power_fraction", ascending=False),
+    )
+    write_csv(
+        output_dir / "mic_integrity.csv",
+        frame[
+            [
+                "recording_id",
+                "subject_id",
+                "condition",
+                "mic_sorted_sha256",
+                "mic_duplicate_group",
+                "mic_duplicate_of",
+                "mic_n_unique_values",
+                "mic_quantisation_step",
+                "mic_power_fraction_below_10hz",
+                "mic_variance_retained_fraction",
+                "mic_snr_above_quantisation_db",
+                "mic_emg_envelope_r_at_zero",
+                "mic_emg_envelope_lag_seconds",
+                "mic_emg_envelope_peak_r",
+                "mic_mains_harmonic_power_fraction",
+            ]
+        ].sort_values(["mic_duplicate_group", "recording_id"]),
     )
     write_csv(
         output_dir / "window_counts.csv",

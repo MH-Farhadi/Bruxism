@@ -146,7 +146,7 @@ the second table and is not comparable to anything produced after it.
 |---|---|---|
 | Notch bank | 60, 120, 180, 240, 300, 360, 420 Hz — every mains multiple in the passband, each 8 Hz wide | The hardware had already removed the fundamental (`notch_filter: Index 9`, `open_questions.md` Q9); the surviving interference was entirely at the harmonics, at 37,000×–846,000× the local noise floor |
 | Bandpass | 20–450 Hz, order 4 | surface-EMG band, below the 600 Hz Nyquist |
-| Microphone | 20 Hz high-pass, order 2 | DC offset only; transducer response undocumented |
+| Microphone | 20 Hz high-pass, order 2 | DC offset only; transducer response undocumented. **Measured cost (`audio.md` §1.4): retains a median 1.19 % of the channel's variance (0.50–3.25 %), discarding the 1–3 Hz band that carries all of its class separation. Retained as the published default so reported runs reproduce; use `mic_envelope_stages()` for new analysis of this transducer.** |
 | Mode | zero-phase (`sosfiltfilt`) | **acausal / offline** |
 
 **Superseded (every run before 2026-08-03):** a single 60 Hz notch at Q = 30, then the same

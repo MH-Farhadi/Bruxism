@@ -46,6 +46,7 @@ __all__ = [
     "NormalisationScope",
     "ScreeningConfig",
     "build_feature_matrix",
+    "emg_only_feature_mask",
     "screen",
     "screening_feature_names",
 ]
@@ -56,6 +57,11 @@ logger = get_logger(__name__)
 #: bands the dual-branch network consumes, so "the network adds nothing over band
 #: energies" is a statement about the same bands.
 _EMG_WAVELET = WaveletConfig(wavelet="db4", level=4, bands=("A4", "D4", "D3", "D2", "D1"))
+#: DEFECT, DECLARED: ``A5`` is 0-18.75 Hz and the microphone chain high-passes at 20 Hz,
+#: so that feature is the log RMS of the chain's roll-off residue (audio.md 1.5). Left in
+#: place because the screening numbers quoted in the manuscript were computed with it;
+#: :func:`emg_only_feature_mask` gives the EMG-only comparison that prices all seven
+#: microphone features.
 _MIC_WAVELET = WaveletConfig(wavelet="coif5", level=5, bands=("A5", "D5", "D4", "D3", "D2", "D1"))
 
 SCREENING_MODEL_IDS: tuple[str, ...] = ("logistic_regression", "gradient_boosting")
@@ -82,6 +88,21 @@ def screening_feature_names(n_emg_channels: int = 4) -> list[str]:
     names += [f"mic_log_rms_{band}" for band in _MIC_WAVELET.bands]
     names.append("mic_log_rms")
     return names
+
+
+def emg_only_feature_mask(n_emg_channels: int = 4) -> np.ndarray:
+    """Boolean mask selecting the EMG features and dropping the seven microphone ones.
+
+    Seven of the 35 screening features are microphone-derived: the log RMS of six coif5
+    bands plus the log RMS of the window. The audit in ``audio.md`` showed those seven read
+    a channel that is duplicated across participants and, above 20 Hz, largely quantisation
+    noise -- and a single scalar mic level reproduces most of the trained audio branch's
+    discrimination. The screening figures quoted in the manuscript for direction were
+    computed with them included, so this mask exists to price them: run the harness twice
+    and report the difference rather than assuming it is small.
+    """
+    names = screening_feature_names(n_emg_channels)
+    return np.array([not name.startswith("mic_") for name in names], dtype=bool)
 
 
 def _log_rms(values: np.ndarray) -> float:

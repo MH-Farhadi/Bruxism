@@ -95,6 +95,7 @@ class RecordingCache:
             )
         self.max_resident = max_resident
         self._resident: dict[str, np.ndarray] = {}
+        self._mic_statistics: dict[str, tuple[float, float]] = {}
         self._order: list[str] = []
         self._computed = 0  # cache misses filtered so far, reported as progress
 
@@ -184,6 +185,21 @@ class RecordingCache:
             )
         return block[:, :-1], block[:, -1]
 
+    def mic_statistics(self, recording_id: str) -> tuple[float, float]:
+        """``(mean, std)`` of one recording's filtered microphone channel.
+
+        For ``NormalizationConfig.mic_scope="per_recording"``. Reads one recording's own
+        unlabelled signal and nothing else -- no labels, no other participant, no training
+        set -- so it does not interact with the leakage guarantees. It is not causal within
+        the recording, which is why the option is off by default and recorded when on.
+
+        Cheap and memoised: the filtered recording is already resident as a memory map.
+        """
+        if recording_id not in self._mic_statistics:
+            mic = np.asarray(self.get(recording_id)[:, -1], dtype=np.float64)
+            self._mic_statistics[recording_id] = (float(mic.mean()), float(mic.std()))
+        return self._mic_statistics[recording_id]
+
     def training_statistics_source(
         self, windows: Sequence[WindowRecord], *, max_windows: int | None = 2000
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -242,8 +258,23 @@ class WindowDataset(Dataset):
     modality
         ``"emg_only"`` zeroes the microphone tensor and ``"audio_only"`` zeroes the EMG
         tensor **after** normalisation, so all three modality conditions see identical
-        windows, splits and preprocessing -- the ablation isolates the modality and nothing
-        else.
+        windows, splits and preprocessing.
+
+        The zeroing here is belt-and-braces, not the mechanism. The model does not build
+        the unused branch at all
+        (:class:`~bruxism.models.dual_branch.DualBranchWaveletCNN`), so its parameters are
+        genuinely absent rather than fed zeros, and the tensor this dataset hands over for
+        the unused modality is never read. Both statements are true and they used to be
+        written as if they were alternatives; the manuscript describes the model's
+        behaviour, which is the one that determines the parameter counts.
+
+        **What the modality conditions do *not* isolate on this dataset.** They vary the
+        modality and nothing else in code, but the microphone channel itself is duplicated
+        across participants (``audio.md`` 1.1), so the audio the held-out participant is
+        scored on is already in the training fold. A contrast between these conditions
+        therefore bounds what a duplicated channel contributes; it does not measure what a
+        microphone contributes. See
+        :func:`~bruxism.runner.assert_modality_is_supported_by_data`.
     """
 
     def __init__(
@@ -340,7 +371,18 @@ class WindowDataset(Dataset):
             # participant's own statistics; every other scope ignores it.
             subject = example.window.subject_id
             emg = self.normalizer.transform_emg(emg, subject=subject)
-            mic = self.normalizer.transform_mic(mic, subject=subject)
+            # The recording's own statistics are only consulted when the normalizer is
+            # configured for mic_scope="per_recording"; computing them is memoised and the
+            # transform ignores them otherwise.
+            mic = self.normalizer.transform_mic(
+                mic,
+                subject=subject,
+                recording_stats=(
+                    self.cache.mic_statistics(example.window.recording_id)
+                    if self.normalizer.config.mic_scope == "per_recording"
+                    else None
+                ),
+            )
 
         emg_tensor = torch.from_numpy(np.ascontiguousarray(emg.T, dtype=np.float32))
         mic_tensor = torch.from_numpy(np.ascontiguousarray(mic[None, :], dtype=np.float32))

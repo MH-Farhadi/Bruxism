@@ -43,13 +43,28 @@ Exactly six columns, in this order. Any deviation raises `SchemaError`.
 | `EMG3_5-6` | float64 | differential EMG, electrode pair 5–6 | **unknown** |
 | `EMG4_7-8` | float64 | differential EMG, electrode pair 7–8 | **unknown** |
 | `Trigger` | float64 | task-active marker; only `{0.0, 1.0}` observed | dimensionless |
-| `Mic` | float64 | microphone; integer-valued on disk | **unknown** |
+| `Mic` | float64 | **not analysable audio — see below and `audio.md`**; integer-valued on disk, 1-count step | **unknown** |
 
 ### 2.1 Units
 
 Physical units were never documented by the acquisition chain. Everything in this project
 reports `SIGNAL_UNITS = "arbitrary_adc_units"`. **Do not label these values µV, Pa or dB.**
 Observed ranges: EMG approximately ±65,000; microphone approximately 50–227.
+
+**The `Mic` column is a failed channel of record (rule `R4`, `audio.md`, Q13).** It is
+not per-participant audio: the 100 recordings hold only 37 distinct microphone
+waveforms (against 100 on each EMG channel), 83 of them bit-identical to another
+*participant's* same-condition recording after a circular rotation of 0.2–8 s, and all
+four S01–S04 rest recordings share one waveform. It is unaligned with the EMG (median
+zero-lag envelope correlation −0.017 over the chewing recordings; median best lag 18 s)
+and 96 % of its power is below 10 Hz, so it behaves as a sound-level/envelope output
+rather than a waveform. It is retained verbatim, never repaired and never de-rotated —
+the offset relative to the EMG is unknown per recording. Manifest schema 1.2 records
+`mic_sorted_sha256`, `mic_duplicate_group`, `mic_quantisation_step`,
+`mic_power_fraction_below_10hz`, `mic_variance_retained_fraction`,
+`mic_snr_above_quantisation_db`, `mic_emg_envelope_*` and
+`mic_mains_harmonic_power_fraction` per recording, plus `emg_sorted_sha256` and
+`trigger_sorted_sha256` as the controls.
 
 ### 2.2 Channel map
 
@@ -204,5 +219,8 @@ Named anomalies:
 - **Metadata conflict:** `S05_molar_clench_20250807T145916` — metadata says
   `incisor_clench`, which is also S05's *separate* incisor recording's key. Filename wins.
 - **`.npy`:** only three exist, all for S01, and none reproduces the CSV — the sixth column
-  is all zeros rather than the microphone channel.
+  is all zeros rather than the microphone channel. EMG and Trigger match the CSV
+  *exactly*. This is not merely a stale cache: it is direct evidence that the acquisition
+  array held no microphone data and the CSV column was filled from elsewhere. See
+  `audio.md` §1.7 and Q13.
 - **Video:** all 100 readable, 640×480, 30 fps, MJPG.

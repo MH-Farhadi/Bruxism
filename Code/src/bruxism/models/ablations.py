@@ -1,5 +1,22 @@
 """Modality ablation conditions, defined so that only the modality varies.
 
+.. warning::
+
+   **The conditions below isolate the modality in code, and the data does not cooperate.**
+   The audit in ``audio.md`` found that the microphone channel of the 2025-08 collection
+   contains 37 distinct waveforms across 100 recordings, that 83 of those recordings carry
+   a waveform bit-identical (after a circular rotation) to another *participant's*
+   recording of the same condition, and that all four S01-S04 quiet-rest recordings share
+   one waveform. A held-out participant's audio is therefore already in the training fold,
+   so these conditions were not evaluated leave-one-subject-out on that channel. Every
+   difference they produce bounds what a duplicated, unaligned, envelope-band channel
+   contributes under this architecture; none of them measures what a microphone
+   contributes, and the direction of the bias is not uniform -- it is optimistic where the
+   duplicated waveform carries the matching label and pessimistic where it does not. The
+   harness is correct; the input is not.
+   :func:`~bruxism.runner.assert_modality_is_supported_by_data` now refuses such a run
+   unless the experiment declares ``mic_defect_acknowledged_by``.
+
 The reviewer concern this addresses (``Temp.md`` item E) is that the microphone may mainly
 be detecting *eating* rather than contributing to the clinically relevant clench/grind
 distinction. Answering it requires the EMG-only, audio-only and fusion conditions to be

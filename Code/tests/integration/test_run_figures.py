@@ -45,6 +45,12 @@ CONFIG = {
     },
     "selection": {"min_epochs": 1, "max_epochs": 1, "patience": 1},
     "augmentation": {"enabled": True, "probability": 0.5},
+    # The fixture microphone is clean, but the mic branch still reads A5 (0-18.75 Hz)
+    # behind a 20 Hz high-pass, so assert_bands_are_inside_their_passband refuses the run
+    # unless it is declared. Declared here rather than fixed because these tests exercise
+    # the SHIPPED architecture; a test that quietly used different bands would stop
+    # covering it.
+    "stopband_bands_acknowledged_by": "integration test, 2026-08-12: exercises the shipped mic branch",
 }
 
 

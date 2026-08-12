@@ -198,6 +198,80 @@ def render_audit_markdown(audit: dict[str, Any], manifest: Any) -> str:  # noqa:
             "",
         ]
 
+    mic = audit.get("mic_integrity")
+    if mic:
+        distinct = mic["distinct_waveforms"]
+        lines += [
+            "## 7c. Microphone integrity",
+            "",
+            "The section above audits the EMG channels for interference. This one audits "
+            "the microphone channel for everything else, because the interference audit "
+            "was never run on it. See `audio.md` for the full write-up.",
+            "",
+            "**Channel identity.** Distinct waveforms per channel, counted by a "
+            "rotation-invariant fingerprint of the samples. Two recordings sharing a "
+            "fingerprint contain the same waveform. The EMG columns are the control:",
+            "",
+            _table(
+                pd.DataFrame(
+                    [
+                        {
+                            "channel": channel,
+                            "distinct waveforms": distinct.get(channel),
+                            "of recordings": mic["n_recordings"],
+                            "cross-subject groups": mic["cross_subject_groups"].get(channel, 0),
+                        }
+                        for channel in ("mic", "emg1", "emg2", "emg3", "emg4", "trigger")
+                    ]
+                )
+            ),
+            f"- Recordings whose microphone waveform also appears under a **different "
+            f"participant**: **{mic['n_recordings_with_duplicated_mic']} of "
+            f"{mic['n_recordings']}** — "
+            + ", ".join(
+                f"{subject} {count}"
+                for subject, count in sorted(mic["duplicated_mic_per_subject"].items())
+            ),
+            "",
+            "**Channel character.** Measured on the raw signal; the retained-variance and "
+            f"SNR figures are against `{mic['chain']}`.",
+            "",
+            f"- Quantisation step(s), in ADC counts: **{mic['quantisation_step_counts']}**",
+            f"- Median share of raw power below 10 Hz: "
+            f"**{mic['median_power_fraction_below_10hz']:.3f}** "
+            f"(an envelope output scores near 1, an acoustic waveform far below it)",
+            f"- Median variance retained by the chain: "
+            f"**{mic['median_variance_retained_fraction']:.4f}**",
+            f"- Median SNR above the quantisation floor: "
+            f"**{mic['median_snr_above_quantisation_db']:.1f} dB**",
+            "",
+            "**Alignment with the EMG.** Circular envelope cross-correlation against the "
+            "largest-variance EMG channel. Two correctly wired channels of one event "
+            "align at lag 0 by construction.",
+            "",
+            f"- Median correlation at zero lag: **{mic['alignment']['median_r_at_zero']:+.3f}**",
+            f"- Median absolute best lag: **{mic['alignment']['median_abs_lag_seconds']:.1f} s**",
+            f"- Unaligned where sound is expected (chewing): "
+            f"**{mic['alignment']['n_unaligned_where_sound_expected']}**",
+            "",
+            "**Flags raised.**",
+            "",
+            _table(
+                pd.DataFrame(
+                    [
+                        {"flag": flag, "recordings": count}
+                        for flag, count in mic["flags_raised"].items()
+                    ]
+                )
+            ),
+            f"- Recordings whose **audio** is therefore blocked for fusion / audio-only "
+            f"runs: **{mic['audio_blocked_recordings']}**. None of them is excluded: the "
+            f"EMG is unaffected and every EMG result stands.",
+            "",
+        ]
+        for flag, description in mic["policy"].items():
+            lines += [f"> **`{flag}`.** {description}", ""]
+
     lines += [
         "## 8. Window counts",
         "",

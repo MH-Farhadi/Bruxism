@@ -45,11 +45,14 @@ from bruxism.utils.logging import get_logger
 
 __all__ = [
     "BAND_PATTERN",
+    "BandStopbandError",
     "WaveletConfig",
     "WaveletDecomposition",
     "WaveletError",
+    "assert_bands_within_passband",
     "band_frequencies",
     "band_index",
+    "band_passband_gain",
     "decompose",
     "max_useful_level",
 ]
@@ -116,6 +119,125 @@ def band_frequencies(band: str, level: int, sampling_rate: float) -> tuple[float
     if kind == "A":
         return 0.0, sampling_rate / 2 ** (level + 1)
     return sampling_rate / 2 ** (band_level + 1), sampling_rate / 2**band_level
+
+
+class BandStopbandError(WaveletError):
+    """Raised when a configured wavelet band lies inside the stopband of its own chain.
+
+    A band the filter has already deleted still produces coefficients -- the roll-off
+    residue -- and the ``BatchNorm1d`` that follows every band branch rescales them back to
+    unit variance. The branch then spends its capacity amplifying whatever the filter left
+    behind, which for a high-pass is drift and per-recording baseline wander: a
+    recording-identity feature, not a physiological one.
+
+    This is the wavelet analogue of the mistake ``cause.md`` documents for the filter
+    itself. There, a chain was verified against its own design rather than against the
+    measured spectrum of the data. Here, a band list was chosen without checking it against
+    the chain that feeds it. In the microphone branch of this project both errors met: the
+    chain high-passes at 20 Hz and the branch reads ``A5``, nominally 0-18.75 Hz.
+    """
+
+
+#: Fraction of a band's nominal width that must survive the chain for it to carry signal.
+#: Well below any sensible design -- a band this attenuated is not a band, it is residue.
+_MIN_BAND_PASSBAND_GAIN: Final[float] = 0.05
+
+
+def band_passband_gain(
+    band: str,
+    level: int,
+    sampling_rate: float,
+    magnitude: Any,
+    *,
+    n_points: int = 512,
+) -> float:
+    """Mean power gain the chain applies across a band's nominal frequency range.
+
+    Parameters
+    ----------
+    magnitude
+        Callable ``f(frequencies) -> |H(f)|`` for the chain feeding this band.
+
+    Returns
+    -------
+    float
+        1.0 when the chain passes the whole band untouched, 0.0 when it deletes it.
+    """
+    low, high = band_frequencies(band, level, sampling_rate)
+    # A band whose lower edge is DC still has a defined mean gain; the grid just starts at
+    # 0 Hz, where a high-pass is by definition at its most attenuating.
+    grid = np.linspace(low, min(high, sampling_rate / 2.0), n_points)
+    response = np.asarray(magnitude(grid), dtype=np.float64)
+    return float(np.mean(response**2))
+
+
+def assert_bands_within_passband(
+    config: WaveletConfig,
+    sampling_rate: float,
+    magnitude: Any,
+    *,
+    context: str,
+    acknowledged: str | None = None,
+    minimum_gain: float = _MIN_BAND_PASSBAND_GAIN,
+) -> dict[str, float]:
+    """Refuse a band list that the filter chain in front of it has already deleted.
+
+    Parameters
+    ----------
+    magnitude
+        Callable ``f(frequencies) -> |H(f)|`` for the chain feeding this branch.
+    context
+        What is being validated, quoted in the error -- e.g. ``"mic branch"``.
+    acknowledged
+        ``"<name>, <date>: <reason>"``. When supplied, an offending band is logged at
+        WARNING and allowed through instead of raising. This exists for one purpose: the
+        published runs of this project used ``A5`` behind a 20 Hz high-pass, and they must
+        keep reproducing. A new configuration that wants the same thing has to say so in
+        writing, which is the whole point.
+
+    Returns
+    -------
+    dict
+        ``band -> mean power gain``, for every configured band.
+
+    Raises
+    ------
+    BandStopbandError
+        If any band's mean power gain is below ``minimum_gain`` and ``acknowledged`` is
+        not set.
+    """
+    gains = {
+        band: band_passband_gain(band, config.level, sampling_rate, magnitude)
+        for band in config.bands
+    }
+    offenders = {band: gain for band, gain in gains.items() if gain < minimum_gain}
+    if not offenders:
+        return gains
+
+    detail = "; ".join(
+        f"{band} ({band_frequencies(band, config.level, sampling_rate)[0]:g}-"
+        f"{band_frequencies(band, config.level, sampling_rate)[1]:g} Hz) retains "
+        f"{gain:.2%} of its power"
+        for band, gain in sorted(offenders.items())
+    )
+    if acknowledged:
+        logger.warning(
+            "%s: band(s) inside the filter stopband, allowed by declaration %r -- %s",
+            context,
+            acknowledged,
+            detail,
+            extra={"context": context, "acknowledged": acknowledged, "gains": gains},
+        )
+        return gains
+    raise BandStopbandError(
+        f"{context}: the filter chain feeding this branch has already removed "
+        f"{'a band' if len(offenders) == 1 else 'bands'} the branch is configured to read "
+        f"-- {detail}. Such a band carries the chain's roll-off residue, which the "
+        f"branch's batch normalisation then rescales to unit variance, so the branch "
+        f"learns per-recording baseline wander rather than signal. Choose bands inside the "
+        f"passband, widen the chain, or -- if reproducing a historical run -- pass "
+        f"acknowledged='<name>, <date>: <reason>'."
+    )
 
 
 def max_useful_level(n_samples: int, wavelet: str) -> int:

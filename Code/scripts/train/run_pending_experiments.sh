@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 #
-# Run the two confirmatory experiments the manuscript still marks as pending, on the
-# corrected (mains-harmonic) filter chain:
+# Run the confirmatory experiments on the corrected (mains-harmonic) filter chain:
 #
-#   RQ3  bruxism-baselines   architecture comparison with matched inputs
-#   RQ2  bruxism-ablations   fusion / EMG-only / audio-only, with and without chewing
+#   RQ3  bruxism-baselines   architecture comparison with matched inputs   -- STILL PENDING
+#   RQ2  bruxism-ablations   fusion / EMG-only / audio-only, +/- chewing   -- DONE
+#
+# RQ2 completed on 2026-08-10 as run modality_and_no_chewing_20260810T020642_cead62e4 and
+# is written up in the manuscript. It was launched through bruxism-ablations directly, so
+# its run id carries the auto-generated timestamp_confighash suffix rather than a RUN_TAG.
+# Re-running 'ablations' here therefore starts a NEW run rather than resuming that one --
+# pass 'baselines' unless you deliberately want to repeat RQ2.
 #
 # Both runs are resumable. If one is interrupted, re-run this script with the same
 # arguments and it picks up at the first fold that has no saved prediction file; nothing
@@ -110,30 +115,49 @@ case "$WHAT" in
 esac
 
 echo
-echo "==> regenerating the paper bundle across every run in outputs/runs"
-bruxism-report \
-  --runs-root outputs/runs \
-  --output-root outputs/paper_bundle \
-  --data-root "$DATA_ROOT" \
-  2>&1 | tee -a "${LOG_DIR}/report_${RUN_TAG}.log"
+echo "==> regenerating one paper bundle per run"
+# One bundle per run, not one pooled bundle. Several runs legitimately contain the same
+# condition -- the primary five-class run and the ablation both hold
+# five_class::dual_branch_wavelet_cnn::fusion -- and the ledger asserts that every held-out
+# window is predicted exactly once per configuration. Pooling them across runs therefore
+# aborts with a duplicate-row assertion, and it would be the wrong comparison anyway:
+# those two conditions differ in protocol, not only in what they measure.
+for run_id in $(
+  case "$WHAT" in
+    baselines) echo "baselines_${RUN_TAG}" ;;
+    ablations) echo "modality_and_no_chewing_${RUN_TAG}" ;;
+    all)       echo "baselines_${RUN_TAG} modality_and_no_chewing_${RUN_TAG}" ;;
+  esac
+); do
+  [[ -f "outputs/runs/${run_id}/predictions.parquet" ]] || continue
+  echo "  ${run_id}  ->  outputs/paper_bundle/${run_id}"
+  bruxism-report \
+    --runs-root outputs/runs \
+    --run-id "$run_id" \
+    --output-root "outputs/paper_bundle/${run_id}" \
+    --data-root "$DATA_ROOT" \
+    2>&1 | tee -a "${LOG_DIR}/report_${RUN_TAG}.log"
+done
 
 cat <<'EOF'
 
 Done. Next steps:
 
-  1. Read outputs/paper_bundle/paper_results.md - it lists every condition, the
-     modality contrast (RQ2) and the architecture comparison (RQ3), each recomputed
-     from the saved prediction ledgers.
+  1. Read outputs/paper_bundle/<run id>/paper_results.md - one bundle per run, each
+     listing that run's conditions recomputed from its saved prediction ledger. The
+     ablation bundle also carries the modality contrast (RQ2).
 
-  2. Hand the new run ids to Claude and ask it to fold the results into
-     Paper/K_Farhadi_Paper_Bruxism/Main_2.tex. Three places currently say
-     "pending re-measurement" and must be replaced with measured values:
-       - Table 3 baseline rows (RQ3)
-       - Table 4 modality ablation rows (RQ2)
-       - the Results, Discussion and Limitations paragraphs that mark them pending
+  2. Fold the results into Paper/K_Farhadi_Paper_Bruxism/Main_2.tex. RQ2 is already
+     written up from modality_and_no_chewing_20260810T020642_cead62e4. What still says
+     "pending re-measurement" is RQ3 only:
+       - Table 3 baseline rows
+       - the RQ3 paragraph in Results (Section 4.1)
+       - the RQ3 sentences in Discussion 6.1 and in Validity and limitations
+       - the RQ3 sentence in the Conclusion and in the Abstract
 
-  3. Regenerate the run-dependent manuscript figures if the headline five-class run
-     changes:
+  3. Regenerate the run-dependent manuscript figures if the run they depict changes:
        python scripts/evaluate/make_manuscript_figures.py \
            --run-dir outputs/runs/<five-class run> --data-root ../Data
+       python scripts/evaluate/make_ablation_figure.py \
+           --run-dir outputs/runs/<ablation run>
 EOF

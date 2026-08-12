@@ -27,6 +27,7 @@ then band-pass" recipe on hardware that already notches has the same defect.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any, Final, Literal
 
@@ -53,13 +54,16 @@ __all__ = [
     "FilterDesignError",
     "FilterStage",
     "apply_filter_chain",
+    "chain_magnitude",
     "design_bandpass",
     "design_comb",
     "design_highpass",
     "design_notch",
     "emg_stages",
     "mains_harmonics",
+    "mic_envelope_stages",
     "validate_cutoffs",
+    "white_noise_power_gain",
 ]
 
 logger = get_logger(__name__)
@@ -400,23 +404,96 @@ def _default_emg_stages() -> list[FilterStage]:
     return emg_stages()
 
 
-def _default_mic_stages() -> list[FilterStage]:
-    """The production microphone chain: DC removal only.
+#: Rationale carried by the published microphone chain, including what it was later
+#: measured to cost. Kept as the default so that the runs already reported reproduce
+#: byte-for-byte; the measurement is attached so no reader can mistake it for a considered
+#: design choice.
+_MIC_HIGHPASS_RATIONALE: Final[str] = (
+    "Remove the large DC offset of the microphone channel. No further shaping is applied "
+    "because the transducer response and units are undocumented. MEASURED COST, added "
+    "2026-08-12 after the audit in audio.md: 96 % of this channel's raw power lies below "
+    "10 Hz (range 91.4-98.7 % over the 100 recordings) and all of its condition separation "
+    "is at 1-3 Hz -- the chew-rhythm band. This 20 Hz high-pass therefore retains a median "
+    "of 1.19 % of the channel's variance (range 0.50-3.25 %) and discards precisely the "
+    "band that carries the information. What survives is at or below the analog-to-digital "
+    "quantisation floor for the clenching and grinding conditions. The stage is RETAINED AS "
+    "THE DEFAULT only because the reported runs used it; it is not recommended. Use "
+    "mic_envelope_stages() for any new analysis of this transducer."
+)
 
-    The microphone channel is integer-valued with a large positive offset. A high-pass at
-    20 Hz removes that offset without touching the chewing/grinding band, and no further
-    shaping is applied because the transducer's response is undocumented.
+
+def _default_mic_stages() -> list[FilterStage]:
+    """The published microphone chain: a 20 Hz high-pass, and nothing else.
+
+    This is the chain every reported run used. It is kept as the default so those runs
+    reproduce exactly, and it is documented as defective rather than quietly replaced --
+    see :data:`_MIC_HIGHPASS_RATIONALE` and ``audio.md`` 1.3-1.4 for what it costs.
+
+    Note also that the mic branch of the model reads a wavelet band, ``A5``, whose nominal
+    range is 0-18.75 Hz at 1200 Hz -- entirely inside this stage's stopband. That branch is
+    therefore fed the high-pass roll-off residue. The contradiction is now caught by
+    :func:`assert_bands_within_passband`; the published configurations declare it
+    explicitly instead of silently reintroducing it.
     """
+    return [FilterStage(kind="highpass", freq_hz=20.0, order=2, rationale=_MIC_HIGHPASS_RATIONALE)]
+
+
+def mic_envelope_stages(
+    *,
+    drift_hz: float = 0.2,
+    ceiling_hz: float = 20.0,
+    sampling_rate: float = 1200.0,
+) -> list[FilterStage]:
+    """The chain this transducer actually needs: keep the modulation band, drop the drift.
+
+    The channel measured in ``audio.md`` is a rectified, smoothed sound-level output, not
+    an acoustic waveform: 96 % of its power is below 10 Hz and the separation between
+    conditions lives at 1-3 Hz (chewing 63.2, movement 41.7, rest 16.6, clenching 4.2,
+    grinding 3.8, in raw counts squared). The published chain
+    (:func:`_default_mic_stages`) removes that band and keeps the quantisation noise above
+    it. This one does the opposite.
+
+    Parameters
+    ----------
+    drift_hz
+        High-pass edge. Low enough to pass the slowest chew rhythm (~0.5 Hz) and high
+        enough to remove baseline wander and the DC offset.
+    ceiling_hz
+        Low-pass edge. Above the fastest masticatory rhythm and below the band in which
+        this channel carries only dither.
+
+    Notes
+    -----
+    **This does not rescue the 2025-08 collection.** The duplication and misalignment
+    documented in ``audio.md`` 1.1-1.2 are independent of any filter, and no chain can
+    undo them. This builder exists for a future collection with the same transducer, and
+    for measuring how much of the discarded band was real.
+    """
+    validate_cutoffs((drift_hz, ceiling_hz), sampling_rate, label="mic envelope chain")
     return [
         FilterStage(
             kind="highpass",
-            freq_hz=20.0,
+            freq_hz=drift_hz,
             order=2,
             rationale=(
-                "Remove the large DC offset of the microphone channel. No further shaping "
-                "is applied because the transducer response and units are undocumented."
+                "Remove the DC offset and baseline wander of the sound-level channel while "
+                "passing the masticatory modulation band. Placed at 0.2 Hz rather than "
+                "20 Hz because the discriminative content of this transducer is at 1-3 Hz "
+                "(audio.md 1.3), which a 20 Hz edge deletes."
             ),
-        )
+        ),
+        FilterStage(
+            kind="bandpass",
+            low_hz=drift_hz,
+            high_hz=ceiling_hz,
+            order=4,
+            rationale=(
+                "Restrict to the modulation band of a rectified sound-level output. Above "
+                f"{ceiling_hz:g} Hz this channel carries quantisation noise rather than "
+                "signal: with a 1.0-count step, 42 of the 100 recordings audited are within "
+                "3 dB of the quantisation floor in the band the published chain kept."
+            ),
+        ),
     ]
 
 
@@ -605,6 +682,54 @@ def _apply_spectral_interpolation(
         magnitude[target] = floor
 
     return np.fft.irfft(magnitude * phase, n=n_samples, axis=0)
+
+
+def chain_magnitude(
+    config: FilterChainConfig, sampling_rate: float, *, modality: Literal["emg", "mic"]
+) -> Callable[[np.ndarray], np.ndarray]:
+    """``|H(f)|`` of a whole chain, as actually applied.
+
+    Squares the single-pass response when ``zero_phase`` is set, because forward-backward
+    filtering applies it twice. Returning a callable rather than an array lets a caller --
+    :func:`~bruxism.preprocessing.wavelets.assert_bands_within_passband`, the filter figure
+    -- choose its own frequency grid.
+    """
+    stages = config.emg_stages if modality == "emg" else config.mic_stages
+
+    def magnitude(frequencies: np.ndarray) -> np.ndarray:
+        grid = np.asarray(frequencies, dtype=np.float64)
+        response = np.ones_like(grid)
+        for stage in stages:
+            response = response * stage.magnitude_response(grid, sampling_rate)
+        return response**2 if config.zero_phase else response
+
+    return magnitude
+
+
+def white_noise_power_gain(
+    config: FilterChainConfig,
+    sampling_rate: float,
+    *,
+    modality: Literal["emg", "mic"],
+    n_points: int = 4096,
+) -> float:
+    """Fraction of a white input's power that survives this chain.
+
+    Mean ``|H(f)|^2`` over the whole 0-Nyquist band, doubled for the zero-phase path
+    because forward-backward filtering applies the response twice. This is exactly the
+    factor that scales a quantisation floor: ADC dither is white, so of the ``step^2 / 12``
+    variance it contributes, only this fraction reaches the analysis band.
+
+    Computed from the designed response rather than assumed from the nominal passband
+    edges, so a chain with seven notches in it is priced correctly.
+
+    A ``spectral_interpolation`` stage has no LTI response; its *intended* rectangular
+    suppression is used, which is what :meth:`FilterStage.magnitude_response` returns and
+    what the filter figure draws.
+    """
+    grid = np.linspace(0.0, sampling_rate / 2.0, n_points)
+    magnitude = chain_magnitude(config, sampling_rate, modality=modality)
+    return float(np.mean(magnitude(grid) ** 2))
 
 
 def apply_filter_chain(

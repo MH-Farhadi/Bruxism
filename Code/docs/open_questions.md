@@ -278,6 +278,70 @@ verification is a separate scholarly task and was not performed here.
 
 ---
 
+## Q13 — Microphone channel provenance ⛔ BLOCKING
+
+**Question.** What produced the `Mic` column, and does any real audio from these sessions
+survive anywhere?
+
+**Evidence from the data (`audio.md`, 2026-08-12).** The column is not per-participant
+audio. Measured over all 100 recordings:
+
+- **37 distinct microphone waveforms**, against 100 on each of the four EMG channels.
+  83 recordings carry a waveform that is bit-identical, after a circular rotation of
+  0.2–8 s, to another *participant's* recording of the same condition. All four S01–S04
+  quiet-rest recordings share one waveform. `S05_protrusion_retrusion` carries the
+  waveform of the other participants' `incisor_clench` — a different condition.
+- **Unaligned with the EMG.** Over the 45 chewing recordings the envelope
+  cross-correlation at zero lag has a median of −0.017 and peaks at a median absolute lag
+  of 18 s.
+- **Not a waveform.** 96 % of raw power below 10 Hz (range 91.4–98.7 %), integer-valued,
+  quantisation step exactly 1.0 count. The production 20 Hz high-pass retains a median of
+  1.19 % of its variance; clenching and grinding are then at or below the quantisation
+  floor.
+- **Corroboration.** The three `.npy` acquisition companions reproduce EMG and Trigger
+  exactly and carry an **all-zero** microphone column (see Q9 and rule R2). The `.avi`
+  files contain no audio stream (`vids` 1, `auds` 0).
+
+**Why it matters.** Leave-one-subject-out does not hold out the audio, so the modality
+ablation bounds what a duplicated channel contributes rather than measuring a microphone.
+RQ2 is unanswerable from these files. The EMG is unaffected — all four channels are
+distinct across every recording — and no other result in the manuscript reads the
+microphone.
+
+**Encoded as.** Five `QualityFlag` entries (`mic_waveform_duplicated`,
+`mic_emg_unaligned`, `mic_at_quantisation_floor`, `mic_bandwidth_implausible`,
+`mic_channel_dead`), measured by `bruxism.preprocessing.mic_integrity`, stored as manifest
+schema 1.2 columns, raised by the cross-recording pass in
+`manifest.flag_shared_waveforms`, and enforced by
+`runner.assert_modality_is_supported_by_data`. Conflict rule
+`R4_mic_channel_is_not_analysable_audio`. Regression test
+`tests/unit/test_leakage.py::test_no_measured_channel_waveform_is_shared_across_subjects`.
+
+**Still open — and this is what BLOCKING refers to.**
+
+1. **Acquisition software.** Who wrote the recorder and does the source survive? The
+   ring-buffer signature and the all-zero `.npy` column should be traceable to a specific
+   bug in minutes with the source in hand. The same writer produced the **trigger**
+   channel, which is load-bearing for every label in the manuscript. Nothing measured so
+   far suggests the trigger is affected, but the audit that would confirm it has not been
+   run.
+2. **Hardware.** Transducer model, output type (waveform vs envelope/AGC), preamp gain,
+   which DAQ input. Overlaps Q3, which has been blocking since 2026-07-27; Q13 now needs
+   it for the *correct description of the channel*, not just for a units label.
+3. **Was the microphone verified during collection?** Did anyone see a live trace? Decides
+   whether a future collection needs an ingest-time liveness check on top of the post-hoc
+   flags.
+4. **Session order.** Confirm S01 was recorded first (2025-08-04) and that the shared
+   waveforms originate from that session. If so, S01's own microphone data may be genuine
+   and the manuscript could say whose audio is real. The metadata does not settle it.
+
+**Answered from the data (2026-08-12).** Whether a second copy of the audio exists: no.
+Project owner confirmed the CSV column is all there ever was; the `.avi` files carry no
+audio stream and the `.npy` companions are zero. The channel is therefore not recoverable
+and Q13 cannot be closed by reanalysis — only by a new acquisition.
+
+---
+
 ## Summary
 
 | ID | Topic | Status | Blocks |
@@ -295,3 +359,4 @@ verification is a separate scholarly task and was not performed here.
 | Q10 | IRB identifier | BLOCKING | Ethics statement |
 | Q11 | Release authorisation | BLOCKING | Data availability |
 | Q12 | Venue and citations | OPEN | formatting |
+| Q13 | Microphone channel provenance | BLOCKING | RQ2; modality ablation; sensor description |

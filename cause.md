@@ -325,3 +325,46 @@ conclusion in the project — including which architecture wins and how much aud
 was measured through a channel that was 85–99 % powerline interference.
 
 The concrete work order is in [`new_prompt.md`](new_prompt.md).
+
+---
+
+## 11. The same mistake, in the other modality (2026-08-12)
+
+Section 10 closes by saying that every conclusion in the project was measured through a
+channel that was 85–99 % interference. That was true of the EMG, and it was fixed. It was
+also, unnoticed, an incomplete statement: **the audit that found it was pointed at one
+modality.** Running the equivalent scrutiny on the microphone column found a defect of a
+different kind and a worse one. The full write-up is [`audio.md`](audio.md); the part that
+belongs here is the shape of the error, because it is the same shape.
+
+**What the EMG defect was.** A filter chain was verified against its own design — a
+textbook notch-then-bandpass recipe, a correct-looking response plot — instead of against
+the measured spectrum of the recordings. Nothing measured how much of the signal was
+interference, so nothing could notice that the chain removed the one frequency that was
+absent and passed the three that dominated.
+
+**What the microphone defect is.** Every quality check in the manifest examined one file at
+a time. Each microphone column is individually well-formed: right length, plausible range,
+no NaNs, no clipping. The defect is only visible *between* files — 100 recordings contain
+37 distinct microphone waveforms, and 83 of them are a circular rotation of another
+participant's same-condition recording. A per-file audit cannot see it, however thorough.
+
+**The common form.** In both cases the check that existed was correct, was run, and was
+scoped one step too narrowly: to the filter rather than the data, and to the file rather
+than the dataset. Neither was caught by testing, version control or reproducibility — the
+pipeline was reproducible throughout, and reproduced the defect faithfully every time.
+
+**What was added.** A rotation-invariant fingerprint of every channel of every recording,
+grouped across the dataset, with a run-level refusal when a held-out participant's signal
+appears in its own training set (`manifest.flag_shared_waveforms`,
+`runner.assert_modality_is_supported_by_data`,
+`tests/unit/test_leakage.py::test_no_measured_channel_waveform_is_shared_across_subjects`).
+It costs one pass over the data. Also added: a check that no branch reads a wavelet band
+its own filter chain has already deleted — the microphone branch read `A5` (0–18.75 Hz)
+behind a 20 Hz high-pass for the entire life of the project, which is §1's mistake
+expressed in the wavelet configuration rather than in the filter.
+
+**Priority.** Unlike item 1 above, there is nothing to fix here: the microphone channel
+cannot be repaired, only re-collected ([`docs/audio_collection_spec.md`](docs/audio_collection_spec.md)).
+The EMG results are unaffected — all four EMG channels are distinct across all 100
+recordings, and that is now asserted on every manifest build rather than assumed.

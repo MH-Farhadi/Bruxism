@@ -1,0 +1,32 @@
+{
+  "run_id": "modality_and_no_chewing_20260810T020642_cead62e4",
+  "config_hash": "cead62e4f03ae906",
+  "manifest_hash": "7ebbcc8d74c0bbe0",
+  "window_index_hash": "b2cf690c6f7ceec6",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "subjects": [
+    "S01",
+    "S02",
+    "S03",
+    "S04",
+    "S05"
+  ],
+  "tasks": [
+    "five_class",
+    "no_chewing_four_class"
+  ],
+  "modalities": [
+    "audio_only",
+    "emg_only",
+    "fusion"
+  ],
+  "n_predictions": 78399,
+  "figures": [
+    "modality_ablation"
+  ],
+  "note": "Every condition shares the windows, folds, seeds and fixed training configuration of this run; only the modality differs, and the unused branch is not constructed. Panel (a) bars are the mean over five participants and three seeds, markers the three seed means. Panel (b) is the paired fusion-minus-EMG-only difference for each participant and seed, so the vertical spread is the quantity the panel (a) bars hide."
+}

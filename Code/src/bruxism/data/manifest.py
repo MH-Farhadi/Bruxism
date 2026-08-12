@@ -6,6 +6,15 @@ scanning every ``*.csv`` under the data root -- including the secondary
 way, reading each file once, and recording checksums, trigger structure, signal ranges,
 metadata agreement and quality flags.
 
+**Two passes, not one.** Every check in :func:`_iter_records` looks at a single file in
+isolation, and for four years of this project that was the whole manifest. It is not
+enough: the microphone defect documented in ``audio.md`` is invisible from any one file and
+obvious the moment two are compared. :func:`build_manifest` therefore runs a second,
+cross-recording pass that groups recordings by a rotation-invariant fingerprint of each
+channel and flags any waveform shared between participants. That pass is what turns
+"83 recordings look fine individually" into "83 recordings carry another participant's
+audio".
+
 Privacy: the manifest stores canonical subject IDs (``S01``), data-root-relative POSIX
 paths and numeric summaries only. It never stores participant names, absolute paths, or
 any reference to surveys, photographs, receipts or reimbursement files.
@@ -22,7 +31,7 @@ from typing import Any, Final
 import numpy as np
 import pandas as pd
 
-from bruxism.data.labels import RAW_TOKEN_TO_CONDITION, family_of_token
+from bruxism.data.labels import RAW_TOKEN_TO_CONDITION, TaskFamily, family_of_token
 from bruxism.data.quality import (
     QUALITY_POLICY_VERSION,
     ExclusionPolicy,
@@ -40,9 +49,20 @@ from bruxism.data.schema import (
     read_recording_csv,
     validate_columns,
 )
+from bruxism.preprocessing.filters import (
+    FilterChainConfig,
+    apply_filter_chain,
+    white_noise_power_gain,
+)
 from bruxism.preprocessing.interference import (
     MAINS_CONTAMINATION_THRESHOLD,
     measure_mains_contamination,
+)
+from bruxism.preprocessing.mic_integrity import (
+    MIC_INTEGRITY_POLICY_VERSION,
+    duplicate_groups,
+    measure_mic_integrity,
+    waveform_fingerprint,
 )
 from bruxism.utils import progress
 from bruxism.utils.io import file_sha256, hash_mapping
@@ -63,7 +83,15 @@ logger = get_logger(__name__)
 
 #: Bump when the manifest column set changes. Runs record the version they were built with.
 #: 1.1 adds the mains-contamination columns.
-MANIFEST_SCHEMA_VERSION: Final[str] = "1.1"
+#: 1.2 adds the microphone-integrity columns and the cross-recording duplication pass.
+MANIFEST_SCHEMA_VERSION: Final[str] = "1.2"
+
+#: Condition families in which a muscle burst and a sound are simultaneous by construction,
+#: so a microphone that does not co-vary with the EMG is provably mis-wired rather than
+#: merely quiet. Chewing is the only unambiguous case: every chew is an impact. Clenching
+#: and grinding do make sound, but far less of it, and a null correlation there could be
+#: honest silence.
+_SOUND_EXPECTED_FAMILIES: Final[frozenset[str]] = frozenset({str(TaskFamily.CHEWING)})
 
 #: Directories under the data root that are never scanned for recordings. They hold
 #: administrative or identifiable material that is not research data.
@@ -351,6 +379,51 @@ class RecordingRecord:
     manifest_schema_version: str = MANIFEST_SCHEMA_VERSION
     conflict_rules_applied: list[str] = field(default_factory=list)
 
+    # --- microphone integrity (audio.md; schema 1.2) --------------------------------
+    #: Rotation-invariant SHA-256 of the microphone samples. Two recordings sharing this
+    #: contain the same waveform. This single column is what makes the duplication in
+    #: ``audio.md`` 1.1 impossible to miss: 100 recordings, 37 distinct values.
+    mic_sorted_sha256: str = ""
+    #: Same fingerprint per EMG channel, in column order. Stored so the microphone finding
+    #: can always be checked against a channel known to be clean -- all four are distinct
+    #: across all 100 recordings.
+    emg_sorted_sha256: list[str] = field(default_factory=list)
+    #: Fingerprint of the trigger channel. Degenerate by design in some recordings (an
+    #: all-zero rest trigger), which is why the duplication pass allows it explicitly.
+    trigger_sorted_sha256: str = ""
+    #: Set by the cross-recording pass: the shared fingerprint's short id, or ``""``.
+    mic_duplicate_group: str = ""
+    #: Other recordings carrying this microphone waveform, semicolon-separated.
+    mic_duplicate_of: str = ""
+    mic_n_unique_values: int = 0
+    #: Least significant bit of the microphone channel, in ADC counts.
+    mic_quantisation_step: float = float("nan")
+    #: Share of raw microphone power below 10 Hz. An envelope output scores near 1.
+    mic_power_fraction_below_10hz: float = float("nan")
+    #: Variance after the microphone chain, as a fraction of the raw variance. Measured
+    #: over the WHOLE recording, because the manifest predates windowing and must not
+    #: depend on a segmentation policy.
+    mic_variance_retained_fraction: float = float("nan")
+    #: Post-chain variance in excess of the quantiser's own contribution, in dB. Also
+    #: whole-recording, which is the conservative direction: pooling active and inactive
+    #: intervals inflates the variance, so a recording that clears the floor here may still
+    #: be at it inside its trigger-active windows. On this dataset the whole-recording rule
+    #: flags 34 of 100 recordings and the trigger-active measurement flags 42.
+    mic_snr_above_quantisation_db: float = float("nan")
+    #: Envelope correlation between the microphone and the largest-variance EMG channel,
+    #: with no shift applied. Two correctly wired channels of one event align at lag 0.
+    mic_emg_envelope_r_at_zero: float = float("nan")
+    #: Shift at which those envelopes correlate best, in seconds.
+    mic_emg_envelope_lag_seconds: float = float("nan")
+    #: Correlation at that best shift.
+    mic_emg_envelope_peak_r: float = float("nan")
+    #: Mains-harmonic share of the RAW microphone power. The audit that produced the
+    #: corrected EMG chain was never run on this channel; now it always is.
+    mic_mains_harmonic_power_fraction: float = float("nan")
+    #: Which microphone chain the retained-variance and SNR columns describe.
+    mic_chain_description: str = ""
+    mic_integrity_policy_version: str = MIC_INTEGRITY_POLICY_VERSION
+
     def to_row(self) -> dict[str, Any]:
         """Flatten to a manifest row (list/tuple columns become JSON-ish strings)."""
         row = dict(self.__dict__)
@@ -360,6 +433,7 @@ class RecordingRecord:
         row["conflict_rules_applied"] = ",".join(self.conflict_rules_applied)
         row["emg_min"] = ",".join(f"{value:.6g}" for value in self.emg_min)
         row["emg_max"] = ",".join(f"{value:.6g}" for value in self.emg_max)
+        row["emg_sorted_sha256"] = ",".join(self.emg_sorted_sha256)
         row["mains_harmonic_power_fraction_per_channel"] = ",".join(
             f"{value:.6g}" for value in self.mains_harmonic_power_fraction_per_channel
         )
@@ -378,6 +452,9 @@ class DatasetManifest:
     sampling_rate_hz: int
     policy: ExclusionPolicy
     manifest_hash: str
+    #: Per-channel cross-recording duplication summary from :func:`flag_shared_waveforms`.
+    #: Empty when the manifest was rehydrated from disk, where it is recomputed on demand.
+    duplication: dict[str, Any] = field(default_factory=dict)
 
     @property
     def frame(self) -> pd.DataFrame:
@@ -401,6 +478,22 @@ class DatasetManifest:
             TriggerRun(index=i, start_sample=b["start_sample"], end_sample=b["end_sample"])
             for i, b in enumerate(record.trigger_run_boundaries)
         ]
+
+    def audio_blocking_flags(self) -> dict[str, tuple[str, ...]]:
+        """Included recordings whose microphone channel is unusable, and why.
+
+        Keyed by recording id; empty when every included recording's microphone may be
+        consumed. Read by :func:`bruxism.runner.assert_modality_is_supported_by_data`
+        before any run that sets ``modality`` to ``fusion`` or ``audio_only``.
+        """
+        blocked: dict[str, tuple[str, ...]] = {}
+        for record in self.included:
+            flags = self.policy.audio_blocked_by(
+                frozenset(QualityFlag(value) for value in record.quality_flags)
+            )
+            if flags:
+                blocked[record.recording_id] = tuple(flag.value for flag in flags)
+        return blocked
 
     def by_id(self, recording_id: str) -> RecordingRecord:
         for record in self.records:
@@ -447,6 +540,11 @@ def _summarise_for_hash(records: Sequence[RecordingRecord]) -> dict[str, Any]:
                     # Rounded: the fraction is a float derived from a Welch estimate, and
                     # the manifest hash must not depend on the last bit of a PSD.
                     "mains_harmonic_power_fraction": round(record.mains_harmonic_power_fraction, 6),
+                    # Channel identity. Exact, not rounded: these are digests, and a
+                    # dataset whose microphone content changes must not keep its hash.
+                    "mic_sorted_sha256": record.mic_sorted_sha256,
+                    "emg_sorted_sha256": list(record.emg_sorted_sha256),
+                    "mic_duplicate_group": record.mic_duplicate_group,
                 }
                 for record in records
             ),
@@ -502,6 +600,7 @@ def _iter_records(
     *,
     probe_video: bool,
     hash_video: bool,
+    filter_config: FilterChainConfig,
 ) -> Iterator[RecordingRecord]:
     companions = _companion_index(data_root)
     for key, csv_path in discovered:
@@ -590,6 +689,30 @@ def _iter_records(
         if mains.fraction > MAINS_CONTAMINATION_THRESHOLD:
             flags.add(QualityFlag.MAINS_CONTAMINATION)
 
+        # --- microphone integrity ------------------------------------------------------
+        # The same measurement, on the channel it was never run on. Everything here is
+        # per-recording; the duplication check needs all of them and lives in
+        # build_manifest().
+        mic_mains = measure_mains_contamination(mic, sampling_rate)
+        filtered_mic = apply_filter_chain(mic, filter_config, sampling_rate, modality="mic")
+        integrity = measure_mic_integrity(
+            mic,
+            sampling_rate,
+            filtered_mic=filtered_mic,
+            retained_bandwidth_fraction=white_noise_power_gain(
+                filter_config, sampling_rate, modality="mic"
+            ),
+            emg=emg,
+        )
+        if integrity.is_dead:
+            flags.add(QualityFlag.MIC_CHANNEL_DEAD)
+        if integrity.is_envelope_not_waveform:
+            flags.add(QualityFlag.MIC_BANDWIDTH_IMPLAUSIBLE)
+        if integrity.is_at_quantisation_floor:
+            flags.add(QualityFlag.MIC_AT_QUANTISATION_FLOOR)
+        if str(family) in _SOUND_EXPECTED_FAMILIES and not integrity.alignment.is_aligned:
+            flags.add(QualityFlag.MIC_EMG_UNALIGNED)
+
         is_rest = condition == "rest"
         if is_rest and runs:
             flags.add(QualityFlag.UNEXPECTED_TRIGGER_IN_REST)
@@ -670,6 +793,26 @@ def _iter_records(
             mains_harmonic_breakdown=";".join(
                 f"{frequency},{value:.6g}" for frequency, value in mains.per_harmonic.items()
             ),
+            mic_sorted_sha256=integrity.fingerprint,
+            emg_sorted_sha256=[waveform_fingerprint(emg[:, i]) for i in range(emg.shape[1])],
+            trigger_sorted_sha256=waveform_fingerprint(trigger),
+            # Filled by the cross-recording pass in build_manifest(); a single file cannot
+            # know whether its waveform appears anywhere else.
+            mic_duplicate_group="",
+            mic_duplicate_of="",
+            mic_n_unique_values=integrity.n_unique_values,
+            mic_quantisation_step=integrity.quantisation_step,
+            mic_power_fraction_below_10hz=integrity.power_fraction_below_10hz,
+            mic_variance_retained_fraction=integrity.variance_retained_fraction,
+            mic_snr_above_quantisation_db=integrity.snr_above_quantisation_db,
+            mic_emg_envelope_r_at_zero=integrity.alignment.r_at_zero,
+            mic_emg_envelope_lag_seconds=integrity.alignment.best_lag_seconds,
+            mic_emg_envelope_peak_r=integrity.alignment.peak_r,
+            mic_mains_harmonic_power_fraction=mic_mains.fraction,
+            mic_chain_description=" -> ".join(
+                stage.describe() for stage in filter_config.mic_stages
+            ),
+            mic_integrity_policy_version=MIC_INTEGRITY_POLICY_VERSION,
             quality_flags=sorted(flag.value for flag in flags),
             excluded=excluded,
             exclusion_reason=reason,
@@ -679,6 +822,140 @@ def _iter_records(
         )
 
 
+def flag_shared_waveforms(records: Sequence[RecordingRecord]) -> dict[str, Any]:
+    """Second pass: find channel waveforms shared between participants, and flag them.
+
+    Mutates ``records`` in place, setting :attr:`RecordingRecord.mic_duplicate_group`,
+    :attr:`RecordingRecord.mic_duplicate_of` and the
+    :data:`~bruxism.data.quality.QualityFlag.MIC_WAVEFORM_DUPLICATED` flag on every
+    recording whose microphone waveform also appears under a different subject.
+
+    Exclusion is deliberately **not** re-evaluated. The flag is not an excluding flag: the
+    EMG of these recordings is sound and removing 83 of 100 files would delete the dataset
+    to protect a channel the EMG results never read. See rule
+    ``R4_mic_channel_is_not_analysable_audio`` and
+    :attr:`~bruxism.data.quality.ExclusionPolicy.audio_blocking_flags`.
+
+    The EMG and trigger channels are checked too, and their result is returned rather than
+    flagged. EMG duplication would be a far more serious finding than the microphone one --
+    it would invalidate every result in the project -- so it is measured every time the
+    manifest is built rather than assumed absent.
+
+    **The trigger result is informational and must not be read as a defect.** The
+    fingerprint is rotation-invariant because it is taken over sorted samples, and for a
+    *binary* channel that means it collides whenever two recordings merely share a duty
+    cycle: an all-zero rest trigger matches every other all-zero trigger, and a scripted
+    protocol that gives every participant the same number of active samples matches
+    trivially. Those collisions say nothing about whether a signal was copied. The
+    measured channels -- the four EMG columns and the microphone -- carry continuous
+    values, so a shared fingerprint there is meaningful, and that is where the flag is
+    raised. Degenerate triggers are counted separately so the informational number can be
+    read at all.
+
+    Returns
+    -------
+    dict
+        Per-channel duplication summary, written into the audit report.
+    """
+    subject_of = {record.recording_id: record.subject_id for record in records}
+    summary: dict[str, Any] = {}
+
+    mic_groups = duplicate_groups(
+        {record.recording_id: record.mic_sorted_sha256 for record in records},
+        subject_of=subject_of,
+        cross_subject_only=True,
+    )
+    member_to_group = {
+        member: fingerprint for fingerprint, members in mic_groups.items() for member in members
+    }
+    for record in records:
+        fingerprint = member_to_group.get(record.recording_id)
+        if fingerprint is None:
+            continue
+        siblings = [m for m in mic_groups[fingerprint] if m != record.recording_id]
+        record.mic_duplicate_group = fingerprint[:8]
+        record.mic_duplicate_of = ";".join(siblings)
+        record.quality_flags = sorted(
+            {*record.quality_flags, QualityFlag.MIC_WAVEFORM_DUPLICATED.value}
+        )
+
+    summary["mic"] = {
+        "n_distinct_waveforms": len({record.mic_sorted_sha256 for record in records}),
+        "n_cross_subject_groups": len(mic_groups),
+        "n_recordings_affected": sum(1 for record in records if record.mic_duplicate_group),
+        "groups": {fingerprint[:8]: members for fingerprint, members in sorted(mic_groups.items())},
+    }
+
+    for index in range(len(records[0].emg_sorted_sha256) if records else 0):
+        emg_groups = duplicate_groups(
+            {record.recording_id: record.emg_sorted_sha256[index] for record in records},
+            subject_of=subject_of,
+            cross_subject_only=True,
+        )
+        summary[f"emg{index + 1}"] = {
+            "n_distinct_waveforms": len({r.emg_sorted_sha256[index] for r in records}),
+            "n_cross_subject_groups": len(emg_groups),
+            "groups": {f[:8]: m for f, m in sorted(emg_groups.items())},
+        }
+        if emg_groups:
+            logger.error(
+                "EMG channel %d shares waveforms across participants: %s. This is not the "
+                "microphone defect -- it would invalidate every result in the project. "
+                "Investigate before running anything.",
+                index + 1,
+                sorted(emg_groups),
+                extra={"channel": index + 1, "groups": sorted(emg_groups)},
+            )
+
+    trigger_groups = duplicate_groups(
+        {record.recording_id: record.trigger_sorted_sha256 for record in records},
+        subject_of=subject_of,
+        cross_subject_only=True,
+    )
+    # A trigger that is constant -- all off in a rest recording, all on in a recording that
+    # was active end to end -- necessarily matches every other constant trigger. That is the
+    # protocol working, not a duplication.
+    degenerate = {
+        fingerprint
+        for fingerprint, members in trigger_groups.items()
+        if all(
+            next(r for r in records if r.recording_id == m).n_trigger_runs in (0, 1)
+            and next(r for r in records if r.recording_id == m).trigger_active_fraction
+            in (0.0, 1.0)
+            for m in members
+        )
+    }
+    summary["trigger"] = {
+        "informational": True,
+        "note": (
+            "A binary channel's sorted-sample fingerprint collides on duty cycle alone, so "
+            "a shared trigger fingerprint is not evidence of copied data. Reported for "
+            "completeness; no flag is raised from it."
+        ),
+        "n_distinct_waveforms": len({record.trigger_sorted_sha256 for record in records}),
+        "n_cross_subject_groups": len(trigger_groups),
+        "n_degenerate_groups_allowed": len(degenerate),
+        "groups": {
+            fingerprint[:8]: members
+            for fingerprint, members in sorted(trigger_groups.items())
+            if fingerprint not in degenerate
+        },
+    }
+
+    affected = summary["mic"]["n_recordings_affected"]
+    if affected:
+        logger.warning(
+            "microphone waveform shared across participants in %d of %d recordings "
+            "(%d distinct waveforms in total); audio-consuming runs are blocked unless "
+            "the experiment declares mic_defect_acknowledged_by. See audio.md.",
+            affected,
+            len(records),
+            summary["mic"]["n_distinct_waveforms"],
+            extra={"n_affected": affected, "n_records": len(records)},
+        )
+    return summary
+
+
 def build_manifest(
     data_root: Path | str,
     *,
@@ -686,6 +963,7 @@ def build_manifest(
     policy: ExclusionPolicy | None = None,
     probe_video: bool = True,
     hash_video: bool = False,
+    filter_config: FilterChainConfig | None = None,
 ) -> DatasetManifest:
     """Scan ``data_root`` and build a validated manifest of every recording.
 
@@ -702,6 +980,12 @@ def build_manifest(
         Read frame count/rate/size from each ``.avi``. Costs a few seconds for 100 files.
     hash_video
         SHA-256 every ``.avi``. Off by default -- the videos total ~1.5 GB.
+    filter_config
+        Chain used only to price the microphone columns: how much of the channel's variance
+        an analysis chain retains, and how that compares to the quantisation floor. Defaults
+        to the production chain. It does **not** affect any other manifest column -- the
+        mains-contamination and range figures are measured on the raw signal by design --
+        and the chain used is recorded per record in ``mic_chain_description``.
 
     Returns
     -------
@@ -711,6 +995,7 @@ def build_manifest(
     """
     root = Path(data_root).resolve()
     active_policy = policy or ExclusionPolicy()
+    active_filters = filter_config or FilterChainConfig()
     discovered = discover_recordings(root)
     logger.info(
         "discovered %d recordings under %s",
@@ -728,12 +1013,16 @@ def build_manifest(
                 active_policy,
                 probe_video=probe_video,
                 hash_video=hash_video,
+                filter_config=active_filters,
             ),
             "reading recordings",
             total=len(discovered),
             unit="file",
         )
     )
+    # Second pass. Must run before the hash: a flag raised here belongs to the manifest's
+    # identity, so a dataset that gains a duplicated waveform gets a different hash.
+    duplication = flag_shared_waveforms(records)
     manifest_hash = hash_mapping(_summarise_for_hash(records))
     logger.info(
         "manifest built: %d records, %d included, hash %s",
@@ -748,6 +1037,7 @@ def build_manifest(
         sampling_rate_hz=sampling_rate_hz,
         policy=active_policy,
         manifest_hash=manifest_hash,
+        duplication=duplication,
     )
 
 
@@ -789,6 +1079,12 @@ def load_manifest(
         ]
         payload["emg_min"] = [float(v) for v in str(payload["emg_min"]).split(",") if v]
         payload["emg_max"] = [float(v) for v in str(payload["emg_max"]).split(",") if v]
+        payload["emg_sorted_sha256"] = [
+            v for v in str(payload["emg_sorted_sha256"]).split(",") if v
+        ]
+        for key in ("mic_duplicate_group", "mic_duplicate_of"):
+            if pd.isna(payload.get(key)):
+                payload[key] = ""
         payload["mains_harmonic_power_fraction_per_channel"] = [
             float(v)
             for v in str(payload["mains_harmonic_power_fraction_per_channel"]).split(",")

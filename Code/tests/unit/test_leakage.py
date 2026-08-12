@@ -50,6 +50,163 @@ def five_subject_index() -> WindowIndex:
     )
 
 
+# ------------------------------------------------------- channel identity ---
+#
+# Everything below this heading exists because of one omission. Every other test in this
+# file checks that *indices and statistics* stay on the right side of the split -- which
+# fold a sample_id is in, which participants a normalizer saw, which stage may augment.
+# None of them ever asked whether the held-out participant's SIGNAL was also in the
+# training set. In the real dataset it was: 83 of 100 recordings carry a microphone
+# waveform that is bit-identical, after a circular rotation, to another participant's
+# recording of the same condition (``audio.md`` 1.1). A leakage suite that cannot see that
+# is checking the bookkeeping and not the science.
+
+
+def test_no_measured_channel_waveform_is_shared_across_subjects(synthetic_manifest):
+    """No measured channel of any recording may reappear under a different participant.
+
+    This is the test that would have caught the microphone defect a year early. It runs on
+    the clean synthetic dataset, where it must pass; the companion test below injects the
+    defect and requires it to fail.
+
+    "Measured" means the four EMG columns and the microphone. The trigger is deliberately
+    excluded: it is binary and protocol-driven, so a fingerprint taken over sorted samples
+    collides whenever two recordings merely share a duty cycle -- every all-zero rest
+    trigger matches every other one. That collision carries no information about copied
+    data, and asserting on it would make this test fire on a correct dataset, which is the
+    fastest way to get a leakage test disabled.
+    """
+    from bruxism.preprocessing.mic_integrity import duplicate_groups
+
+    records = synthetic_manifest.records
+    subject_of = {record.recording_id: record.subject_id for record in records}
+
+    channels: dict[str, dict[str, str]] = {
+        "mic": {r.recording_id: r.mic_sorted_sha256 for r in records}
+    }
+    for index in range(len(records[0].emg_sorted_sha256)):
+        channels[f"emg{index + 1}"] = {r.recording_id: r.emg_sorted_sha256[index] for r in records}
+
+    offences = {
+        channel: groups
+        for channel, fingerprints in channels.items()
+        if (
+            groups := duplicate_groups(fingerprints, subject_of=subject_of, cross_subject_only=True)
+        )
+    }
+    assert not offences, (
+        f"measured channel waveforms are shared across participants: {offences}. A "
+        f"held-out participant whose signal is already in the training fold is not held out."
+    )
+    # The trigger is still reported, and still labelled as what it is.
+    assert synthetic_manifest.duplication["trigger"]["informational"] is True
+
+
+def test_the_channel_identity_test_actually_detects_a_planted_duplicate(tmp_path):
+    """The guard above must fail on a dataset that has the defect.
+
+    A leakage test that cannot fail is decoration. This writes a dataset in which every
+    participant's ``gum`` recording carries the same microphone waveform, rotated -- the
+    real failure mode, not a byte-for-byte copy -- and requires the manifest to notice.
+    """
+    from bruxism.data.manifest import build_manifest
+    from bruxism.data.quality import QualityFlag
+    from tests.fixtures.synthetic import SyntheticDatasetSpec, write_synthetic_dataset
+
+    root = tmp_path / "planted"
+    write_synthetic_dataset(root, SyntheticDatasetSpec(duplicate_mic_condition="gum"))
+    manifest = build_manifest(root, probe_video=False)
+
+    flagged = [
+        record.recording_id
+        for record in manifest.records
+        if QualityFlag.MIC_WAVEFORM_DUPLICATED.value in record.quality_flags
+    ]
+    # Four, not five: S02's gum recording is the fixture's deliberately short one, so it
+    # cannot carry a rotation of the others' longer waveform and joins no group. That the
+    # count is four rather than five is itself the detector behaving correctly -- it groups
+    # on identical content, not on a shared condition label.
+    assert len(flagged) == 4, f"expected the four full-length gum recordings, got {flagged}"
+    assert all("gum" in recording_id for recording_id in flagged)
+    assert not any("S02" in recording_id for recording_id in flagged)
+    # And the EMG must stay clean, or the detector is flagging on something else.
+    assert manifest.duplication["emg1"]["n_cross_subject_groups"] == 0
+
+
+def test_planted_duplicates_are_exact_rotations_not_merely_similar(tmp_path):
+    """A shared fingerprint is confirmed by exact rotation, never by correlation alone."""
+    import pandas as pd
+
+    from bruxism.preprocessing.mic_integrity import is_circular_rotation
+    from tests.fixtures.synthetic import SyntheticDatasetSpec, write_synthetic_dataset
+
+    root = tmp_path / "planted"
+    write_synthetic_dataset(root, SyntheticDatasetSpec(duplicate_mic_condition="gum"))
+    columns = {
+        path.name: pd.read_csv(path, usecols=["Mic"])["Mic"].to_numpy(float)
+        for path in sorted(root.rglob("gum_*.csv"))
+    }
+    # Only the full-length recordings share a waveform; the short one has its own.
+    longest = max(len(values) for values in columns.values())
+    replayed = {name: v for name, v in columns.items() if len(v) == longest}
+    assert len(replayed) == 4
+
+    offsets = set()
+    reference = next(iter(replayed.values()))
+    for name, candidate in replayed.items():
+        rotated, offset = is_circular_rotation(reference, candidate)
+        assert rotated, f"{name} shares a fingerprint but is not a rotation"
+        offsets.add(offset)
+    # Distinct rotations, so the test is not passing on trivially identical copies -- which
+    # is what makes it a faithful miniature of the real defect.
+    assert len(offsets) == len(replayed)
+
+
+def test_audio_run_is_refused_on_flagged_data(tmp_path):
+    """A fusion run must not start on data whose microphone is flagged, unsigned."""
+    from bruxism.config import ExperimentConfig
+    from bruxism.data.manifest import build_manifest
+    from bruxism.runner import DataDefectError, assert_modality_is_supported_by_data
+    from tests.fixtures.synthetic import SyntheticDatasetSpec, write_synthetic_dataset
+
+    root = tmp_path / "planted"
+    write_synthetic_dataset(root, SyntheticDatasetSpec(duplicate_mic_condition="gum"))
+    manifest = build_manifest(root, probe_video=False)
+
+    fusion = ExperimentConfig(name="t", modality="fusion")
+    with pytest.raises(DataDefectError, match="mic_waveform_duplicated"):
+        assert_modality_is_supported_by_data(fusion, manifest)
+
+    # EMG-only is unaffected: the defect is in a channel it never reads.
+    assert_modality_is_supported_by_data(ExperimentConfig(name="t", modality="emg_only"), manifest)
+
+    # And the concession can be taken, in writing.
+    signed = ExperimentConfig(
+        name="t", modality="fusion", mic_defect_acknowledged_by="tester, 2026-08-12: reason"
+    )
+    assert_modality_is_supported_by_data(signed, manifest)
+
+
+def test_acknowledgements_do_not_change_the_configuration_hash():
+    """Who signed for a run cannot change what the run computes, so it cannot change its id.
+
+    The published bundles (``2b6fb5ac``, ``cead62e4``) must keep their hashes after the
+    acknowledgements are added to their configurations, or the manuscript's provenance
+    section stops being true.
+    """
+    from bruxism.config import ExperimentConfig
+
+    plain = ExperimentConfig(name="t")
+    signed = ExperimentConfig(
+        name="t",
+        mic_defect_acknowledged_by="tester, 2026-08-12: reason",
+        stopband_bands_acknowledged_by="tester, 2026-08-12: reason",
+    )
+    assert plain.config_hash == signed.config_hash
+    # ...but they are still recorded, or the audit trail would be lost.
+    assert signed.to_dict()["mic_defect_acknowledged_by"] is not None
+
+
 # ------------------------------------------------------------------- splits ---
 
 

@@ -45,6 +45,12 @@ class SyntheticDatasetSpec:
     metadata_conflict: tuple[int, str, str] = (5, "molar_clench", "incisor_clench")
     secondary_location: tuple[int, str] = (5, "rest")
     startup_transient: tuple[int, str] = (3, "open_close")
+    #: Condition whose microphone column is replayed, circularly rotated, into every
+    #: participant's recording of that condition. Reproduces the real defect of ``audio.md``
+    #: 1.1 in miniature so the detector has something to detect. ``None`` -- the default --
+    #: gives every recording its own independent microphone, which is what a clean
+    #: acquisition looks like and what the rest of the suite asserts.
+    duplicate_mic_condition: str | None = None
     base_date: str = "20250804"
     seed: int = 20260727
     _unused: tuple[str, ...] = field(default_factory=tuple, repr=False)
@@ -106,8 +112,16 @@ def make_recording(
 
     mic = 150.0 + rng.standard_normal(total) * 2.0
     # Chewing-like conditions get a loud audio signature, mirroring the real shortcut.
+    #
+    # The chew rhythm modulates a BROADBAND carrier rather than being added as a bare 4 Hz
+    # tone. That is what a microphone records -- an impact is wideband -- and it matters for
+    # the fixture's purpose: a bare envelope would trip
+    # QualityFlag.MIC_BANDWIDTH_IMPLAUSIBLE, so the default synthetic dataset would carry
+    # the very defect it exists to be the clean control for. Defects are opt-in here; see
+    # SyntheticDatasetSpec.duplicate_mic_condition.
     if condition in ("cheese", "carrots", "gum"):
-        mic[active] += 30.0 * np.abs(np.sin(2 * np.pi * 4.0 * t))[active]
+        modulation = np.abs(np.sin(2 * np.pi * 4.0 * t))
+        mic[active] += 30.0 * modulation[active] * rng.standard_normal(int(active.sum()))
     mic = np.round(mic)
 
     if with_startup_transient:
@@ -157,6 +171,7 @@ def write_synthetic_dataset(root: Path, spec: SyntheticDatasetSpec) -> Path:
     """Write a complete synthetic dataset tree under ``root``."""
     root = Path(root)
     seed = spec.seed
+    shared_mic: dict[tuple[str, int], np.ndarray] = {}
     for subject in range(1, spec.n_subjects + 1):
         primary = root / f"Subject_{subject}"
         primary.mkdir(parents=True, exist_ok=True)
@@ -177,6 +192,23 @@ def write_synthetic_dataset(root: Path, spec: SyntheticDatasetSpec) -> Path:
                     n_samples=n_samples,
                     with_startup_transient=spec.startup_transient == (subject, condition),
                 )
+
+                if spec.duplicate_mic_condition == condition:
+                    # The acquisition defect, in miniature: one canned waveform per
+                    # condition, replayed into every participant with a small ring-buffer
+                    # rotation. Rotating rather than copying matters -- a naive
+                    # byte-comparison of the files would miss it, which is exactly why the
+                    # real defect survived so long.
+                    mic_column = CANONICAL_COLUMNS[5]
+                    # Keyed by length as well as condition: the deliberately short
+                    # recording cannot carry a rotation of a longer waveform, so it gets
+                    # its own and simply does not join a duplicate group.
+                    canned = shared_mic.setdefault(
+                        (condition, len(frame)),
+                        frame[mic_column].to_numpy(dtype=np.float64).copy(),
+                    )
+                    rotation = (subject * 977) % len(canned)
+                    frame[mic_column] = np.roll(canned, rotation)
 
                 target_dir = primary
                 if spec.secondary_location == (subject, condition):

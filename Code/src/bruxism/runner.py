@@ -32,6 +32,8 @@ from bruxism.evaluation.aggregation import summarise_ledger
 from bruxism.evaluation.metrics import PredictionLedger
 from bruxism.models.ablations import AblationSpec
 from bruxism.preprocessing.calibration import build_calibration_block
+from bruxism.preprocessing.filters import chain_magnitude
+from bruxism.preprocessing.wavelets import assert_bands_within_passband
 from bruxism.training.engine import NestedLOSOTrainer, resolve_device
 from bruxism.utils import progress
 from bruxism.utils.io import (
@@ -44,7 +46,14 @@ from bruxism.utils.io import (
 from bruxism.utils.logging import get_logger, setup_logging
 from bruxism.utils.reproducibility import collect_environment, collect_source_state
 
-__all__ = ["RunBundle", "prepare_data", "run_experiment"]
+__all__ = [
+    "DataDefectError",
+    "RunBundle",
+    "assert_bands_are_inside_their_passband",
+    "assert_modality_is_supported_by_data",
+    "prepare_data",
+    "run_experiment",
+]
 
 logger = get_logger(__name__)
 
@@ -110,6 +119,113 @@ def prepare_data(
     return manifest, window_index, cache
 
 
+class DataDefectError(RuntimeError):
+    """Raised when a run would consume a channel the manifest has flagged as defective."""
+
+
+def assert_modality_is_supported_by_data(
+    config: ExperimentConfig, manifest: DatasetManifest
+) -> None:
+    """Refuse a microphone-reading run on data whose microphone is flagged.
+
+    The audit in ``audio.md`` found that 83 of the 100 recordings in this collection carry
+    a microphone waveform belonging to another participant, that the channel is unaligned
+    with the EMG, and that its analysis band is at the quantisation floor. A fusion or
+    audio-only run on such data is not evaluating leave-one-subject-out on that channel,
+    and the resulting modality contrast measures the defect rather than the microphone.
+
+    Nothing here excludes a recording or changes a number. It stops a run that would
+    produce an uninterpretable one, and it can be overridden -- in writing, in the
+    configuration, recorded in the run bundle -- by
+    :attr:`~bruxism.config.ExperimentConfig.mic_defect_acknowledged_by`. Reproducing the
+    published ablation is exactly the case the override exists for.
+
+    Raises
+    ------
+    DataDefectError
+        If the run reads the microphone, the manifest flags it, and no acknowledgement is
+        declared.
+    """
+    if not config.reads_microphone:
+        return
+    blocked = manifest.audio_blocking_flags()
+    if not blocked:
+        return
+
+    reasons: dict[str, int] = {}
+    for flags in blocked.values():
+        for flag in flags:
+            reasons[flag] = reasons.get(flag, 0) + 1
+    summary = ", ".join(f"{flag} x{count}" for flag, count in sorted(reasons.items()))
+
+    if config.mic_defect_acknowledged_by:
+        logger.warning(
+            "microphone-reading run proceeding on flagged data by declaration %r: "
+            "%d of %d included recordings flagged (%s). Any modality contrast from this "
+            "run describes the defect as much as the microphone -- see audio.md.",
+            config.mic_defect_acknowledged_by,
+            len(blocked),
+            len(manifest.included),
+            summary,
+            extra={
+                "acknowledged_by": config.mic_defect_acknowledged_by,
+                "n_blocked": len(blocked),
+                "reasons": reasons,
+            },
+        )
+        return
+
+    raise DataDefectError(
+        f"experiment {config.name!r} has modality {config.modality!r} "
+        f"(sweep: {list(config.sweep_modalities) or [config.modality]}) and therefore reads "
+        f"the microphone, but {len(blocked)} of {len(manifest.included)} included recordings "
+        f"carry a microphone-integrity flag: {summary}. See audio.md and rule "
+        f"R4_mic_channel_is_not_analysable_audio. Run EMG-only, or -- if you are "
+        f"deliberately reproducing a published result on this channel -- set "
+        f"mic_defect_acknowledged_by: '<name>, <date>: <reason>' in the experiment "
+        f"configuration so the concession is recorded in the run bundle."
+    )
+
+
+def assert_bands_are_inside_their_passband(config: ExperimentConfig) -> dict[str, dict[str, float]]:
+    """Refuse a branch configured to read a band its own filter chain has removed.
+
+    The mirror of ``cause.md``'s lesson on the wavelet side: there, a filter was verified
+    against its own design instead of against the data; here, a band list was chosen
+    without checking it against the chain in front of it. In this project both met -- the
+    microphone chain high-passes at 20 Hz and the microphone branch reads ``A5``, nominally
+    0-18.75 Hz, so a third of that branch is fed the high-pass roll-off residue and the
+    batch normalisation behind it rescales that residue to unit variance.
+
+    Returns
+    -------
+    dict
+        ``branch -> {band: mean power gain}``, written into the run bundle so the number is
+        recorded even when the check passes.
+    """
+    from bruxism.models.dual_branch import DualBranchConfig
+
+    model = DualBranchConfig.from_dict(
+        {"num_classes": config.task.num_classes, **dict(config.model_overrides)}
+    )
+    rate = float(config.data.sampling_rate_hz)
+    gains: dict[str, dict[str, float]] = {}
+    for branch, modality in (("emg", "emg"), ("mic", "mic")):
+        if branch == "mic" and not config.reads_microphone:
+            continue
+        if branch == "emg" and config.modality == "audio_only" and not config.sweep_modalities:
+            continue
+        branch_config = model.emg if branch == "emg" else model.mic
+        gains[branch] = assert_bands_within_passband(
+            branch_config.wavelet,
+            rate,
+            chain_magnitude(config.filters, rate, modality=modality),  # type: ignore[arg-type]
+            context=f"{config.name}: {branch} branch",
+            acknowledged=config.stopband_bands_acknowledged_by,
+        )
+    return gains
+
+
 def _default_run_id(config: ExperimentConfig) -> str:
     stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
     return f"{config.name}_{stamp}_{config.config_hash[:8]}"
@@ -162,6 +278,10 @@ def run_experiment(
     """
     run_started = time.perf_counter()
     manifest, window_index, cache = prepare_data(config, data_root=data_root)
+    # Both guards run before the run directory is created: a refused run must leave no
+    # half-written bundle behind for a later resume to pick up.
+    assert_modality_is_supported_by_data(config, manifest)
+    band_gains = assert_bands_are_inside_their_passband(config)
     run_id = config.output.run_id or _default_run_id(config)
     run_dir = Path(config.output.runs_root) / run_id
     if run_dir.exists() and not (resume or config.output.overwrite):
@@ -193,6 +313,14 @@ def run_experiment(
             "n_records": len(manifest.records),
             "n_included": len(manifest.included),
             "subject_ids": manifest.subject_ids,
+            # Recorded whether or not this run reads the microphone, so a bundle can always
+            # be asked what state the audio channel was in when it was produced.
+            "channel_duplication": manifest.duplication,
+            "audio_blocking_flags": manifest.audio_blocking_flags(),
+            "mic_defect_acknowledged_by": config.mic_defect_acknowledged_by,
+            "reads_microphone": config.reads_microphone,
+            "wavelet_band_passband_gains": band_gains,
+            "stopband_bands_acknowledged_by": config.stopband_bands_acknowledged_by,
             "segmentation": window_index.config.to_dict(),
             "window_index_hash": window_index.index_hash,
             "n_windows": len(window_index.windows),

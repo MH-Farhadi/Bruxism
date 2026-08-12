@@ -111,8 +111,8 @@ one fit per fold, no nested selection. Every output it writes says so.
 |---|---|---|
 | **Smoke test** — exercise every stage | `bruxism-train --config configs/experiments/smoke.yaml --max-folds 1` | ~35 s |
 | **Primary five-class endpoint** | `bruxism-train --config configs/experiments/five_class_nested_loso.yaml` | hours |
-| **Modality + no-chewing ablations** (the critical audio analysis) | `bruxism-ablations --config configs/experiments/modality_and_no_chewing.yaml` | hours |
-| **Architecture baselines**, matched inputs | `bruxism-baselines --config configs/experiments/baselines.yaml` | hours |
+| **Modality + no-chewing ablations** (RQ2 — *ran, but see the defect note below*) | `bruxism-ablations --config configs/experiments/modality_and_no_chewing.yaml` | ~5 h |
+| **Architecture baselines**, matched inputs (RQ3 — *still pending*) | `bruxism-baselines --config configs/experiments/baselines.yaml` | 6–10 h |
 | **Binary / ternary / legacy** endpoints | `bruxism-ablations --config configs/experiments/secondary_tasks.yaml` | hours |
 | Check a config without training | add `--validate-only` | seconds |
 | Cap the work | add `--max-folds N` | — |
@@ -120,7 +120,47 @@ one fit per fold, no nested selection. Every output it writes says so.
 | Skip the figures a finished run draws | add `--no-figures` | saves ~20 s–2 min |
 
 Runs are **resumable**: rerunning the same command reuses completed folds, and refuses to
-resume across a changed configuration, manifest or window index.
+resume across a changed configuration, manifest or window index. Resume works by run id, so
+pin one with `--run-id` if a job might cross midnight or be interrupted.
+
+#### Confirmatory-run status
+
+The manuscript's two confirmatory experiments are at different stages. Both are wrapped by
+`scripts/train/run_pending_experiments.sh`, which pins the run ids, tees a log, and
+regenerates one paper bundle per run afterwards.
+
+| RQ | Experiment | Status | Run id |
+|---|---|---|---|
+| RQ2 | modality ablation (fusion / EMG-only / audio-only, ± chewing) | **ran 2026-08-10; unanswerable** — the microphone channel is duplicated across participants (`../audio.md`, `docs/open_questions.md` Q13), so LOSO never held out the audio. Reported as run in `Main_2.tex`; bounds a duplicated channel rather than measuring a microphone. Any new fusion or audio-only run must declare `mic_defect_acknowledged_by`. | `modality_and_no_chewing_20260810T020642_cead62e4` |
+| RQ3 | architecture baselines (temporal CNN, early-fusion CNN, BiLSTM) | **pending** | — |
+
+```bash
+./scripts/train/run_pending_experiments.sh check       # validate both configs, ~15 s, trains nothing
+./scripts/train/run_pending_experiments.sh baselines   # RQ3, the one still outstanding
+./scripts/train/run_pending_experiments.sh ablations   # RQ2 again — starts a NEW run, see below
+```
+
+Detach a long job rather than holding a terminal:
+
+```bash
+mkdir -p outputs/logs
+nohup ./scripts/train/run_pending_experiments.sh baselines \
+    > outputs/logs/baselines_nohup.log 2>&1 &
+tail -f outputs/logs/baselines_nohup.log
+```
+
+| Variable | Default | Effect |
+|---|---|---|
+| `DATA_ROOT` | `../Data` | Where the recordings live |
+| `RUN_TAG` | today, `YYYYMMDD` | Suffix of the run ids — `baselines_<tag>`. Keep it identical across attempts to resume. |
+
+The completed RQ2 run was launched through `bruxism-ablations` directly, so its id carries
+the auto-generated `<timestamp>_<config hash>` suffix rather than a `RUN_TAG`. Re-running
+`ablations` through the script therefore starts a **new** run rather than resuming that one.
+
+> **These are confirmatory runs.** Do not re-run one after seeing its score, and do not edit
+> a config between attempts. A changed config is a new experiment with a new name, and the
+> superseded result is reported as superseded.
 
 Every finished run also writes its own figure set — see
 [**What a finished run draws**](#what-a-finished-run-draws) below.
@@ -242,8 +282,8 @@ number a result depends on, so turning it on or off cannot change what a run com
 adding it to an existing project does not invalidate a resumable run.
 
 The manuscript bundle (`bruxism-report`) is a different artifact with a different job: it
-pools *across* runs to build the paper's tables, LaTeX macros and narrative. Use the run
-folder to understand one run; use the bundle to write the paper.
+builds the paper's tables, LaTeX macros and narrative from one or more saved ledgers. Use
+the run folder to understand one run; use the bundle to write the paper.
 
 ---
 
@@ -257,12 +297,28 @@ re-runs a model and never re-reads raw data (except for the t-SNE, which must re
 held-out embeddings from a checkpoint and is skipped with a recorded reason if
 `--data-root` is absent).
 
+**Pass `--run-id` and give each run its own output root.** The ledger asserts that every
+held-out window is predicted exactly once per configuration, and more than one run in
+`outputs/runs` legitimately holds `five_class::dual_branch_wavelet_cnn::fusion` — the
+primary five-class run and the modality ablation both do. Pooling them aborts with a
+duplicate-row assertion, and it would be the wrong comparison anyway: those two conditions
+differ in protocol, not only in what they measure.
+
 ```bash
-bruxism-report --runs-root outputs/runs --output-root outputs/paper_bundle \
+# the primary five-class run the manuscript's headline numbers come from
+bruxism-report --runs-root outputs/runs \
+               --run-id five_class_nested_loso_20260807T211827_2b6fb5ac \
+               --output-root outputs/paper_bundle/five_class \
+               --data-root ../Data
+
+# the RQ2 modality ablation; this bundle is the one that carries the modality contrast
+bruxism-report --runs-root outputs/runs \
+               --run-id modality_and_no_chewing_20260810T020642_cead62e4 \
+               --output-root outputs/paper_bundle/modality_ablation \
                --data-root ../Data
 ```
 
-produces:
+each of which produces:
 
 ```
 outputs/paper_bundle/

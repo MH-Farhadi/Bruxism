@@ -26,7 +26,8 @@ __all__ = [
 
 #: Increment whenever a flag definition, threshold or resolution rule changes.
 #: 2026-08-03.1 adds MAINS_CONTAMINATION.
-QUALITY_POLICY_VERSION: Final[str] = "2026-08-03.1"
+#: 2026-08-12.1 adds the five microphone-integrity flags (audio.md).
+QUALITY_POLICY_VERSION: Final[str] = "2026-08-12.1"
 
 
 class QualityFlag(StrEnum):
@@ -62,6 +63,25 @@ class QualityFlag(StrEnum):
     NOT_COMPLETED = "not_completed"
     #: Most of the raw in-band EMG power sits at multiples of the mains frequency.
     MAINS_CONTAMINATION = "mains_contamination"
+
+    # --- microphone integrity (audio.md, 2026-08-12) --------------------------------
+    # These five describe the microphone channel. None of them excludes a recording: the
+    # EMG in the affected files is sound, and excluding them would destroy the five-class
+    # results for a defect that lives in a channel those results never read. They gate
+    # audio-consuming runs instead -- see ExclusionPolicy.audio_blocking_flags.
+
+    #: This recording's microphone waveform also appears under a different participant.
+    MIC_WAVEFORM_DUPLICATED = "mic_waveform_duplicated"
+    #: The microphone envelope does not line up with the EMG envelope in a recording whose
+    #: condition should produce muscle activity and sound at the same instant.
+    MIC_EMG_UNALIGNED = "mic_emg_unaligned"
+    #: What survives the microphone filter chain is at or below the ADC quantisation floor.
+    MIC_AT_QUANTISATION_FLOOR = "mic_at_quantisation_floor"
+    #: Almost all of the raw microphone power is below 10 Hz: an envelope, not a waveform.
+    MIC_BANDWIDTH_IMPLAUSIBLE = "mic_bandwidth_implausible"
+    #: The microphone channel is constant, or its whole variance is below one quantisation
+    #: step.
+    MIC_CHANNEL_DEAD = "mic_channel_dead"
 
 
 _FLAG_DESCRIPTIONS: Final[dict[QualityFlag, str]] = {
@@ -130,6 +150,56 @@ _FLAG_DESCRIPTIONS: Final[dict[QualityFlag, str]] = {
         "The corrected chain notches every harmonic; this flag describes the raw signal "
         "and stays raised afterwards, because what it records is a property of the "
         "acquisition, not of the analysis."
+    ),
+    QualityFlag.MIC_WAVEFORM_DUPLICATED: (
+        "This recording's microphone waveform is bit-identical, after a circular rotation, "
+        "to the microphone waveform of a recording belonging to a DIFFERENT participant. "
+        "RETAINED, NOT EXCLUDED -- the EMG channels of these recordings are distinct and "
+        "sound, and the five-class results do not read the microphone. What the flag does "
+        "is block audio-consuming runs (ExclusionPolicy.audio_blocking_flags), because a "
+        "held-out participant whose audio is already in the training fold is not being "
+        "held out on that channel at all. In the 2025-08 collection 83 of 100 recordings "
+        "carry this flag and the 100 files contain only 37 distinct microphone waveforms, "
+        "against 100 distinct waveforms on each of the four EMG channels (audio.md 1.1). "
+        "Never repaired: the rotation offset relative to the EMG is unknown, so a "
+        "de-rotation would be a guess presented as a fix."
+    ),
+    QualityFlag.MIC_EMG_UNALIGNED: (
+        "The microphone and EMG envelopes of this recording do not co-vary at zero lag, in "
+        "a condition where every muscle burst should coincide with a sound. Measured as a "
+        "circular envelope cross-correlation; flagged when the zero-lag correlation is "
+        "below 0.10 or the best lag exceeds 0.25 s. RETAINED, NOT EXCLUDED, and blocking "
+        "for audio runs only. Over the 45 chewing recordings here the zero-lag correlation "
+        "has a median of -0.017 and the best lag a median magnitude of 18 s, so window-level "
+        "fusion of the two channels cannot work by construction (audio.md 1.2)."
+    ),
+    QualityFlag.MIC_AT_QUANTISATION_FLOOR: (
+        "After the microphone filter chain, the variance left in the analysis band is "
+        "within 3 dB of the variance the analog-to-digital quantiser itself contributes "
+        "(step^2/12). The branch is being fed dither. RETAINED, NOT EXCLUDED, and blocking "
+        "for audio runs only. In this dataset the step is exactly 1.0 count and 34 of the "
+        "100 recordings are at the floor measured over the whole recording, rising to 42 "
+        "when measured over trigger-active samples only -- which is the material windows "
+        "are actually cut from, so the whole-recording rule used here is the conservative "
+        "one. Broken down by condition, the clenching and grinding families are at or "
+        "below the floor (audio.md 1.4)."
+    ),
+    QualityFlag.MIC_BANDWIDTH_IMPLAUSIBLE: (
+        "More than 90 % of the raw microphone power lies below 10 Hz, which is the "
+        "signature of a rectified sound-level or envelope output rather than an acoustic "
+        "waveform. RETAINED, NOT EXCLUDED, and blocking for audio runs only. Informative "
+        "rather than damning on its own -- an envelope sensor is a legitimate instrument -- "
+        "but it means the channel must be analysed in its modulation band and must not be "
+        "described as a microphone or decomposed with a waveform wavelet. Every recording "
+        "here scores 0.914-0.987 (audio.md 1.3)."
+    ),
+    QualityFlag.MIC_CHANNEL_DEAD: (
+        "The microphone column is constant, or its entire variance is below one "
+        "quantisation step. RETAINED, NOT EXCLUDED, and blocking for audio runs only. No "
+        "recording in the 2025-08 collection raises this, but the three .npy acquisition "
+        "companions that exist do have an all-zero microphone column while reproducing the "
+        "EMG and trigger columns exactly, so the acquisition path could produce it "
+        "(audio.md 1.7, rule R2)."
     ),
 }
 
@@ -215,6 +285,43 @@ CONFLICT_RESOLUTIONS: Final[dict[str, ConflictResolution]] = {
             approved_by="sol.md implementation brief",
             approved_on="2026-07-27",
         ),
+        ConflictResolution(
+            rule_id="R4_mic_channel_is_not_analysable_audio",
+            applies_to="Every recording of the 2025-08 collection",
+            conflict=(
+                "The CSV 'Mic' column is documented and used as a microphone signal, but "
+                "measurement shows it is not one. The 100 recordings contain 37 distinct "
+                "microphone waveforms against 100 on each EMG channel; 83 recordings carry "
+                "a waveform that is bit-identical, after a circular rotation of 0.2-8 s, to "
+                "another participant's recording of the same condition, and all four "
+                "S01-S04 quiet-rest recordings share one waveform. The channel is unaligned "
+                "with the EMG (median zero-lag envelope correlation -0.017 over the chewing "
+                "recordings, median best lag 18 s) and 96 % of its power lies below 10 Hz. "
+                "The three .npy acquisition companions reproduce EMG and trigger exactly "
+                "and carry an all-zero microphone column, and the .avi files contain no "
+                "audio stream."
+            ),
+            resolution=(
+                "The microphone column of this collection is not analysable audio. It is "
+                "retained verbatim, never repaired and never de-rotated. Recordings carry "
+                "the five mic_* quality flags; the flags exclude nothing, and instead block "
+                "any run whose modality is 'fusion' or 'audio_only' unless the experiment "
+                "configuration declares 'mic_defect_acknowledged_by'. Results already "
+                "published from this channel are reported as run, with the defect stated; "
+                "they are not silently regenerated."
+            ),
+            rationale=(
+                "The offset of the microphone column relative to the EMG is unknown per "
+                "recording, so no re-alignment is recoverable from the files, and no second "
+                "copy of the signal exists. Excluding the affected recordings would remove "
+                "83 of 100 files and destroy the EMG results, which are unaffected: the EMG "
+                "channels are distinct across every recording. Blocking the audio path "
+                "rather than the recording is therefore the proportionate rule. See "
+                "audio.md for the full audit and the reproduction commands."
+            ),
+            approved_by="audio.md audit",
+            approved_on="2026-08-12",
+        ),
     )
 }
 
@@ -235,6 +342,23 @@ class ExclusionPolicy:
             QualityFlag.NOT_COMPLETED,
             QualityFlag.NO_TRIGGER_ACTIVITY,
             QualityFlag.UNEXPECTED_TRIGGER_IN_REST,
+        }
+    )
+    #: Flags that do not exclude a recording but make its **microphone channel** unusable.
+    #:
+    #: Kept separate from ``excluding_flags`` on purpose. The microphone defect documented
+    #: in rule R4 affects 83 of 100 recordings; excluding those would delete the dataset to
+    #: protect a channel the EMG results never read. The proportionate rule is to leave the
+    #: recording in and refuse to let a fusion or audio-only run consume it unsigned --
+    #: enforced by :meth:`audio_blocked_by` and the guard in
+    #: :func:`bruxism.runner.assert_modality_is_supported_by_data`.
+    audio_blocking_flags: frozenset[QualityFlag] = frozenset(
+        {
+            QualityFlag.MIC_WAVEFORM_DUPLICATED,
+            QualityFlag.MIC_EMG_UNALIGNED,
+            QualityFlag.MIC_AT_QUANTISATION_FLOOR,
+            QualityFlag.MIC_BANDWIDTH_IMPLAUSIBLE,
+            QualityFlag.MIC_CHANNEL_DEAD,
         }
     )
     #: Minimum usable duration in seconds; shorter recordings cannot yield a window.
@@ -268,3 +392,14 @@ class ExclusionPolicy:
                 f"duration {duration_seconds:.2f}s below minimum {self.min_duration_seconds:.2f}s"
             )
         return False, ""
+
+    def audio_blocked_by(
+        self, flags: frozenset[QualityFlag] | set[QualityFlag]
+    ) -> tuple[QualityFlag, ...]:
+        """Which of a recording's flags make its microphone channel unusable.
+
+        Empty when the microphone may be consumed. Non-empty does not mean the recording is
+        excluded -- see :attr:`audio_blocking_flags` -- it means a run that reads the
+        microphone must declare ``mic_defect_acknowledged_by`` before it may start.
+        """
+        return tuple(sorted(set(flags) & set(self.audio_blocking_flags), key=lambda f: f.value))

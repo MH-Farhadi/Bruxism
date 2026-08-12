@@ -423,3 +423,187 @@ def test_feature_extraction_raises_on_a_degenerate_window_rather_than_zero_filli
     extractor = FeatureExtractor(FeatureConfig(sampling_rate=FS))
     with pytest.raises(ValueError):
         extractor.extract(np.zeros((1200, 4)), np.zeros(1200))
+
+
+# ------------------------------------------------- microphone integrity ---
+#
+# The interference audit in this file was written for the EMG chain after ``cause.md``.
+# These cover the equivalent checks on the microphone channel, which nothing measured until
+# ``audio.md``.
+
+
+def test_fingerprint_is_invariant_to_rotation_and_dtype(rng):
+    from bruxism.preprocessing.mic_integrity import waveform_fingerprint
+
+    signal = np.round(rng.standard_normal(4096) * 20 + 120)
+    assert waveform_fingerprint(signal) == waveform_fingerprint(np.roll(signal, 1337))
+    # A column read as int64 from one CSV and float64 from another is the same signal.
+    assert waveform_fingerprint(signal) == waveform_fingerprint(signal.astype(np.int64))
+    assert waveform_fingerprint(signal) != waveform_fingerprint(signal + 1)
+
+
+def test_rotation_is_confirmed_exactly_not_by_correlation(rng):
+    from bruxism.preprocessing.mic_integrity import is_circular_rotation
+
+    signal = rng.standard_normal(2048)
+    rotated, offset = is_circular_rotation(signal, np.roll(signal, -617))
+    assert rotated and offset == 617
+
+    # A signal that merely correlates well is not a rotation.
+    nearly = np.roll(signal, -617).copy()
+    nearly[0] += 1e-6
+    assert is_circular_rotation(signal, nearly) == (False, -1)
+    assert is_circular_rotation(signal, rng.standard_normal(2048)) == (False, -1)
+    assert is_circular_rotation(signal, signal[:100]) == (False, -1)
+
+
+def test_quantisation_step_and_floor_detection():
+    from bruxism.preprocessing.mic_integrity import measure_mic_integrity, quantisation_step
+
+    rng = np.random.default_rng(7)
+    t = np.arange(12000) / FS
+    # A raw channel on a 1-count grid with plenty of low-frequency content -- the shape of
+    # the real microphone column.
+    raw = np.round(100.0 + 20.0 * np.sin(2 * np.pi * 1.5 * t))
+    assert quantisation_step(raw) == pytest.approx(1.0)
+
+    # The chain leaves behind a variance equal to the quantiser's own contribution
+    # (step**2 / 12 = 0.083). That is the clenching and grinding case in the real data.
+    floor = np.sqrt(1.0 / 12.0) * rng.standard_normal(t.size)
+    assert measure_mic_integrity(raw, FS, filtered_mic=floor).is_at_quantisation_floor
+
+    # An order of magnitude above the floor is not.
+    signal = 3.0 * rng.standard_normal(t.size)
+    assert not measure_mic_integrity(raw, FS, filtered_mic=signal).is_at_quantisation_floor
+
+
+def test_a_constant_channel_is_reported_dead_not_crashed():
+    from bruxism.preprocessing.mic_integrity import measure_mic_integrity
+
+    integrity = measure_mic_integrity(np.full(12000, 123.0), FS)
+    assert integrity.is_dead
+    assert np.isnan(integrity.quantisation_step)
+
+
+def test_envelope_alignment_recovers_a_known_shift(rng):
+    from bruxism.preprocessing.mic_integrity import measure_envelope_alignment
+
+    # Two channels carrying the same burst pattern on a 120 Hz carrier. The bursts are
+    # placed irregularly on purpose: a periodic rhythm would make the cross-correlation
+    # ambiguous by exactly one period, and the test would then be checking arithmetic
+    # rather than alignment.
+    t = np.arange(12000) / FS
+    carrier = np.sin(2 * np.pi * 120.0 * t)
+    rhythm = np.zeros(t.size)
+    for start in (900, 2400, 4100, 5300, 7000, 9100, 10400):
+        rhythm[start : start + 400] = 1.0
+    shift = 600  # 0.5 s, far outside the 0.25 s tolerance
+    a = rhythm * carrier + 0.01 * rng.standard_normal(t.size)
+    b = np.roll(rhythm, shift) * carrier + 0.01 * rng.standard_normal(t.size)
+
+    aligned = measure_envelope_alignment(a, a, FS)
+    assert aligned.is_aligned
+    assert aligned.r_at_zero > 0.9
+
+    shifted = measure_envelope_alignment(a, b, FS)
+    assert not shifted.is_aligned
+    assert shifted.best_lag_seconds == pytest.approx(-0.5, abs=0.05)
+
+
+def test_envelope_only_channel_is_recognised_as_such(rng):
+    from bruxism.preprocessing.mic_integrity import measure_mic_integrity
+
+    t = np.arange(24000) / FS
+    envelope = 100.0 + 20.0 * np.sin(2 * np.pi * 1.5 * t) + 0.3 * rng.standard_normal(t.size)
+    integrity = measure_mic_integrity(np.round(envelope), FS)
+    assert integrity.is_envelope_not_waveform
+    assert integrity.power_fraction_below_10hz > 0.9
+
+    broadband = 100.0 + 20.0 * rng.standard_normal(t.size)
+    assert not measure_mic_integrity(np.round(broadband), FS).is_envelope_not_waveform
+
+
+def test_the_production_mic_chain_discards_almost_all_of_an_envelope_channel(rng):
+    """The measured cost of the published 20 Hz high-pass, as a regression test."""
+    from bruxism.preprocessing.filters import FilterChainConfig, apply_filter_chain
+
+    t = np.arange(24000) / FS
+    envelope = np.round(
+        100.0 + 20.0 * np.sin(2 * np.pi * 1.5 * t) + 0.3 * rng.standard_normal(t.size)
+    )
+    filtered = apply_filter_chain(envelope, FilterChainConfig(), FS, modality="mic")
+    retained = filtered.var() / envelope.var()
+    assert retained < 0.05, (
+        f"expected the high-pass to discard almost everything, kept {retained:.3f}"
+    )
+
+
+def test_the_envelope_chain_keeps_what_the_published_chain_discards(rng):
+    from bruxism.preprocessing.filters import (
+        FilterChainConfig,
+        apply_filter_chain,
+        mic_envelope_stages,
+    )
+
+    t = np.arange(24000) / FS
+    envelope = np.round(
+        100.0 + 20.0 * np.sin(2 * np.pi * 1.5 * t) + 0.3 * rng.standard_normal(t.size)
+    )
+    chain = FilterChainConfig(mic_stages=tuple(mic_envelope_stages()))
+    filtered = apply_filter_chain(envelope, chain, FS, modality="mic")
+    assert filtered.var() / envelope.var() > 0.9
+
+
+def test_white_noise_power_gain_matches_a_measured_pass_through(rng):
+    from bruxism.preprocessing.filters import (
+        FilterChainConfig,
+        apply_filter_chain,
+        white_noise_power_gain,
+    )
+
+    white = rng.standard_normal(200000)
+    for modality in ("emg", "mic"):
+        chain = FilterChainConfig()
+        predicted = white_noise_power_gain(chain, FS, modality=modality)
+        measured = apply_filter_chain(white, chain, FS, modality=modality).var() / white.var()
+        assert predicted == pytest.approx(measured, rel=0.05)
+
+
+def test_a_band_inside_the_stopband_is_refused():
+    from bruxism.preprocessing.filters import FilterChainConfig, chain_magnitude
+    from bruxism.preprocessing.wavelets import (
+        BandStopbandError,
+        WaveletConfig,
+        assert_bands_within_passband,
+    )
+
+    chain = FilterChainConfig()
+    magnitude = chain_magnitude(chain, FS, modality="mic")
+    published = WaveletConfig(wavelet="coif5", level=5, bands=("A5", "D3", "D1"))
+
+    with pytest.raises(BandStopbandError, match="A5"):
+        assert_bands_within_passband(published, FS, magnitude, context="mic branch")
+
+    # Declared in writing, it is allowed through and the gain is still reported.
+    gains = assert_bands_within_passband(
+        published, FS, magnitude, context="mic branch", acknowledged="tester, 2026-08-12"
+    )
+    assert gains["A5"] < 0.05 < gains["D3"]
+
+    # A band list inside the passband passes with no declaration.
+    inside = WaveletConfig(wavelet="coif5", level=5, bands=("D3", "D1"))
+    assert_bands_within_passband(inside, FS, magnitude, context="mic branch")
+
+
+def test_the_emg_branch_bands_are_all_inside_the_emg_passband():
+    """The control: the defect is specific to the microphone branch."""
+    from bruxism.preprocessing.filters import FilterChainConfig, chain_magnitude
+    from bruxism.preprocessing.wavelets import WaveletConfig, assert_bands_within_passband
+
+    gains = assert_bands_within_passband(
+        WaveletConfig(wavelet="db4", level=4, bands=("A4", "D3", "D1")),
+        FS,
+        chain_magnitude(FilterChainConfig(), FS, modality="emg"),
+        context="emg branch",
+    )
+    assert min(gains.values()) > 0.05

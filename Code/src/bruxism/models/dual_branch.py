@@ -144,6 +144,16 @@ class DualBranchConfig:
 
     num_classes: int
     emg: BranchConfig = field(default_factory=lambda: BranchConfig(in_channels=4))
+    #: DEFECT, DECLARED (audio.md 1.5). ``A5`` is nominally 0-18.75 Hz at 1200 Hz, and the
+    #: production microphone chain high-passes at 20 Hz: the band retains 2.95 % of its
+    #: power, so this sub-branch is fed the high-pass roll-off residue and the
+    #: ``BatchNorm1d`` behind it rescales that residue to unit variance. The band list is
+    #: kept because every reported run used it and must keep reproducing;
+    #: :func:`~bruxism.preprocessing.wavelets.assert_bands_within_passband` now refuses it
+    #: unless an experiment declares ``stopband_bands_acknowledged_by``. A new mic branch
+    #: should read bands inside its chain's passband, or -- better for this transducer --
+    #: use :func:`~bruxism.preprocessing.filters.mic_envelope_stages` and bands in the
+    #: 0.2-20 Hz modulation range where the signal actually is.
     mic: BranchConfig = field(
         default_factory=lambda: BranchConfig(
             in_channels=1,

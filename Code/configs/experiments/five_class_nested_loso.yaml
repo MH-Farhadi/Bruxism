@@ -87,3 +87,20 @@ output:
   runs_root: outputs/runs
   save_checkpoints: true
   save_embeddings: true
+
+# --- microphone defect acknowledgements (audio.md, 2026-08-12) ------------------------
+# The microphone channel of the 2025-08 collection is duplicated across participants,
+# unaligned with the EMG, and at the quantisation floor in its analysis band; and the mic
+# branch reads A5 (0-18.75 Hz), which its own 20 Hz high-pass has already removed. Both
+# guards would refuse this run. It is declared rather than fixed because this configuration
+# must keep reproducing the published bundle byte for byte. Neither key enters the
+# configuration hash -- an acknowledgement records who authorised a run, not what it
+# computes -- so this file still hashes to the value in the manuscript.
+mic_defect_acknowledged_by: >-
+  audio.md audit, 2026-08-12: reproduces a published run on the defective microphone
+  channel. Any modality contrast from this run bounds what a duplicated, unaligned,
+  envelope-band channel contributes under this architecture; it does not measure what a
+  microphone contributes.
+stopband_bands_acknowledged_by: >-
+  audio.md audit, 2026-08-12: the published mic branch reads A5 behind a 20 Hz high-pass.
+  Retained to reproduce the reported runs; not to be copied into a new configuration.

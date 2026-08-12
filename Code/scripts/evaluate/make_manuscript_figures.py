@@ -1,7 +1,8 @@
 """Regenerate the run-dependent manuscript figures for ``Paper/K_Farhadi_Paper_Bruxism``.
 
-Six of the manuscript's figures depend on a training run and must be rebuilt whenever the
-reported run changes::
+Seven of the manuscript's figures depend on this run and must be rebuilt whenever the
+reported run changes (the modality-ablation figure depends on a different run and is drawn
+by ``make_ablation_figure.py``)::
 
     Figures/confmatrx_5class            held-out confusion matrices
     Figures/five_class_roc_curves       one-vs-rest ROC

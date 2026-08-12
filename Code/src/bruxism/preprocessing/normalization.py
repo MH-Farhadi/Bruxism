@@ -82,6 +82,21 @@ class NormalizationConfig:
     method: Literal["zscore", "robust"] = "zscore"
     calibration: Literal["none", "rest_plus_one_repetition", "all_windows_upper_bound"] = "none"
     calibration_approved_by: str | None = None
+    #: Scale the microphone by each *recording's* own statistics instead of by one pooled
+    #: number. Off by default, and off in every reported run.
+    #:
+    #: Why it exists: the surviving microphone content in this dataset is largely a
+    #: per-recording noise floor (``audio.md`` 1.4, 1.6), and a single pooled mic scale
+    #: turns that floor into a usable feature -- a scalar log-RMS of the filtered mic window
+    #: reproduces most of the trained audio branch's per-class AUC. Dividing each recording
+    #: by its own scale removes that shortcut.
+    #:
+    #: Why it is off: it is a *design* change, not a repair. It uses no label and no
+    #: cross-participant information -- a recording's own scale is available at inference
+    #: time on a live stream -- but it does read the whole recording, so it is not causal
+    #: within a recording, and it cannot undo the duplication or the misalignment. Enabling
+    #: it changes the numbers, so it must never become a silent default.
+    mic_scope: Literal["fitted", "per_recording"] = "fitted"
 
     def __post_init__(self) -> None:
         if self.scope == "per_participant" and self.calibration == "none":
@@ -116,12 +131,19 @@ class NormalizationConfig:
         run bundle unreadable by the code that wrote it. Derived facts belong in the run
         bundle's own descriptive files, not in the round-tripped configuration.
         """
-        return {
+        payload = {
             "scope": self.scope,
             "method": self.method,
             "calibration": self.calibration,
             "calibration_approved_by": self.calibration_approved_by,
         }
+        # Emitted only when it is doing something. ``mic_scope`` changes the numbers, so it
+        # must reach the configuration hash whenever it is set -- and a configuration
+        # written before this option existed must keep the identity it was published under.
+        # Both hold if the default is absent from the serialisation.
+        if self.mic_scope != "fitted":
+            payload["mic_scope"] = self.mic_scope
+        return payload
 
 
 @dataclass
@@ -292,9 +314,33 @@ class Normalizer:
         centre, scale, _, _ = self._stats_for(subject)
         return (np.asarray(emg, dtype=np.float64) - centre) / scale
 
-    def transform_mic(self, mic: np.ndarray, *, subject: str | None = None) -> np.ndarray:
-        """Apply fitted microphone statistics."""
+    def transform_mic(
+        self,
+        mic: np.ndarray,
+        *,
+        subject: str | None = None,
+        recording_stats: tuple[float, float] | None = None,
+    ) -> np.ndarray:
+        """Apply microphone statistics.
+
+        Parameters
+        ----------
+        recording_stats
+            ``(centre, scale)`` computed from this window's own recording. Used only when
+            ``config.mic_scope == "per_recording"``; ignored otherwise, so a caller may pass
+            it unconditionally. Supplying it is not leakage -- it reads one recording's
+            unlabelled signal, which is available at inference time -- but it is not causal
+            within the recording, and the run bundle records that the option was on.
+        """
         _, _, centre, scale = self._stats_for(subject)
+        if self.config.mic_scope == "per_recording":
+            if recording_stats is None:
+                raise ValueError(
+                    "mic_scope='per_recording' needs this window's own recording "
+                    "statistics; the caller must pass recording_stats"
+                )
+            centre, scale = recording_stats
+            scale = max(scale, _EPS)
         return (np.asarray(mic, dtype=np.float64) - centre) / scale
 
     def assert_not_fitted_on(self, forbidden_subjects: tuple[str, ...] | list[str]) -> None:

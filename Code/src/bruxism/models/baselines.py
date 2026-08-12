@@ -75,6 +75,12 @@ TEMPORAL_DUAL_BRANCH_DEFAULTS: dict[str, Any] = {
         modulation=True,
         modulation_bins=6,
     ),
+    # DEFECT, DECLARED: A5 (0-18.75 Hz) is inside the 20 Hz high-pass stopband of the
+    # microphone chain -- see DualBranchConfig.mic and audio.md 1.5. Kept identical to the
+    # proposed model's mic branch on purpose: this baseline exists to isolate the
+    # *architecture*, so it must inherit the same front end, defect included. Refused by
+    # assert_bands_within_passband unless the experiment declares
+    # stopband_bands_acknowledged_by.
     "mic": BranchConfig(
         in_channels=1,
         wavelet=WaveletConfig(wavelet="coif5", level=5, bands=("A5", "D3", "D1")),

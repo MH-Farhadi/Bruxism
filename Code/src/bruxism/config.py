@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Any, Literal, TypeVar
+from typing import Any, ClassVar, Literal, TypeVar
 
 from bruxism.data.labels import get_task
 from bruxism.data.quality import ExclusionPolicy
@@ -174,6 +174,19 @@ class ExperimentConfig:
     sweep_task_ids: tuple[str, ...] = ()
     sweep_modalities: tuple[Modality, ...] = ()
     sweep_model_ids: tuple[str, ...] = ()
+    #: ``"<name>, <date>: <reason>"``. Required before any run that reads the microphone
+    #: may start on data carrying a microphone-integrity flag. See ``audio.md`` and rule
+    #: ``R4_mic_channel_is_not_analysable_audio``: 83 of the 100 recordings in the 2025-08
+    #: collection carry another participant's audio, so a fusion or audio-only run on them
+    #: is not evaluating leave-one-subject-out on that channel. Same idiom as
+    #: ``trigger_off_rest_approved_by`` and ``calibration_approved_by`` -- a concession that
+    #: has to be signed for rather than defaulted into.
+    mic_defect_acknowledged_by: str | None = None
+    #: ``"<name>, <date>: <reason>"``. Required before a branch may read a wavelet band that
+    #: its own filter chain has already removed. The published runs read the mic ``A5``
+    #: band (0-18.75 Hz) behind a 20 Hz high-pass and must keep reproducing, so they declare
+    #: it here; a new configuration that wants the same thing has to say so in writing.
+    stopband_bands_acknowledged_by: str | None = None
 
     def __post_init__(self) -> None:
         get_task(self.task_id)  # raises on an unknown task id
@@ -181,6 +194,12 @@ class ExperimentConfig:
             get_task(task_id)
         if self.modality not in ("fusion", "emg_only", "audio_only"):
             raise ConfigError(f"unknown modality {self.modality!r}")
+
+    @property
+    def reads_microphone(self) -> bool:
+        """Whether any condition this run will execute consumes the microphone channel."""
+        modalities = set(self.sweep_modalities) or {self.modality}
+        return bool(modalities & {"fusion", "audio_only"})
 
     @property
     def task(self):  # noqa: ANN201 - returns ClassificationTask
@@ -208,12 +227,33 @@ class ExperimentConfig:
             "sweep_task_ids": list(self.sweep_task_ids),
             "sweep_modalities": list(self.sweep_modalities),
             "sweep_model_ids": list(self.sweep_model_ids),
+            "mic_defect_acknowledged_by": self.mic_defect_acknowledged_by,
+            "stopband_bands_acknowledged_by": self.stopband_bands_acknowledged_by,
+        }
+
+    #: Keys that are recorded in ``resolved_config.yaml`` but excluded from
+    #: :attr:`config_hash`. An acknowledgement says who authorised a run and why; it does
+    #: not change a single number the run computes. Two runs that differ only in who signed
+    #: for them must produce identical results, and therefore identical identity -- and the
+    #: published bundles (``2b6fb5ac``, ``cead62e4``) must keep their hashes after the
+    #: acknowledgements required by ``audio.md`` are added to their configurations.
+    _UNHASHED_KEYS: ClassVar[frozenset[str]] = frozenset(
+        {"mic_defect_acknowledged_by", "stopband_bands_acknowledged_by"}
+    )
+
+    def hashed_dict(self) -> dict[str, Any]:
+        """The part of the configuration that determines the numbers, and only that."""
+        return {
+            key: value for key, value in self.to_dict().items() if key not in self._UNHASHED_KEYS
         }
 
     @property
     def config_hash(self) -> str:
-        """Identity of this configuration, recorded on every prediction row."""
-        return hash_mapping(self.to_dict())
+        """Identity of this configuration, recorded on every prediction row.
+
+        Computed from :meth:`hashed_dict`, not :meth:`to_dict`: see :attr:`_UNHASHED_KEYS`.
+        """
+        return hash_mapping(self.hashed_dict())
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> ExperimentConfig:
