@@ -1,0 +1,47 @@
+This is BibTeX, Version 0.99d (TeX Live 2025/dev/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main_v6.aux
+The style file: sn-nature.bst
+Database file #1: refs.bib
+sn-nature.bst [2024/07/19 v1.1 bibliography style]
+You've used 89 entries,
+            2732 wiz_defined-function locations,
+            1606 strings with 31597 characters,
+and the built_in function-call counts, 35764 in all, are:
+= -- 2576
+> -- 980
+< -- 0
++ -- 490
+- -- 245
+* -- 4620
+:= -- 4002
+add.period$ -- 265
+call.type$ -- 89
+change.case$ -- 89
+chr.to.int$ -- 0
+cite$ -- 89
+duplicate$ -- 3075
+empty$ -- 3142
+format.name$ -- 327
+if$ -- 7053
+int.to.chr$ -- 0
+int.to.str$ -- 89
+missing$ -- 775
+newline$ -- 453
+num.names$ -- 89
+pop$ -- 455
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 459
+stack$ -- 0
+substring$ -- 1775
+swap$ -- 3329
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 1
+type$ -- 0
+warning$ -- 0
+while$ -- 228
+width$ -- 91
+write$ -- 977

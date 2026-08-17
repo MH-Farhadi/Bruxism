@@ -1,0 +1,727 @@
+\begin{thebibliography}{10}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\burl{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\providecommand{\bibinfo}[2]{#2}
+\providecommand{\eprint}[2][]{\url{#2}}
+\providecommand{\doi}[1]{\url{https://doi.org/#1}}
+\bibcommenthead
+
+\bibitem{raez2006techniques}
+\bibinfo{author}{Raez, M. B.~I.}, \bibinfo{author}{Hussain, M.~S.} \&
+  \bibinfo{author}{Mohd-Yasin, F.}
+\newblock \bibinfo{title}{Techniques of {EMG} signal analysis: Detection,
+  processing, classification and applications}.
+\newblock \emph{\bibinfo{journal}{Biological Procedures Online}}
+  \textbf{\bibinfo{volume}{8}}, \bibinfo{pages}{11--35} (\bibinfo{year}{2006}).
+
+\bibitem{colonna2023electromyographic}
+\bibinfo{author}{Colonna, A.}, \bibinfo{author}{Noveri, L.},
+  \bibinfo{author}{Ferrari, M.}, \bibinfo{author}{Bracci, A.} \&
+  \bibinfo{author}{Manfredini, D.}
+\newblock \bibinfo{title}{Electromyographic assessment of masseter muscle
+  activity: A proposal for a 24 h recording device with preliminary data}.
+\newblock \emph{\bibinfo{journal}{Journal of Clinical Medicine}}
+  \textbf{\bibinfo{volume}{12}}, \bibinfo{pages}{247} (\bibinfo{year}{2023}).
+
+\bibitem{thymi2021signal}
+\bibinfo{author}{Thymi, M.} \emph{et~al.}
+\newblock \bibinfo{title}{Signal acquisition and analysis of ambulatory
+  electromyographic recordings for the assessment of sleep bruxism: A scoping
+  review}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{48}}, \bibinfo{pages}{846--871}
+  (\bibinfo{year}{2021}).
+
+\bibitem{cidverdejo2024instrumental}
+\bibinfo{author}{Cid-Verdejo, R.} \emph{et~al.}
+\newblock \bibinfo{title}{Instrumental assessment of sleep bruxism: A
+  systematic review and meta-analysis}.
+\newblock \emph{\bibinfo{journal}{Sleep Medicine Reviews}}
+  \textbf{\bibinfo{volume}{74}}, \bibinfo{pages}{101906}
+  (\bibinfo{year}{2024}).
+
+\bibitem{lobbezoo2013bruxism}
+\bibinfo{author}{Lobbezoo, F.} \emph{et~al.}
+\newblock \bibinfo{title}{Bruxism defined and graded: An international
+  consensus}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{40}}, \bibinfo{pages}{2--4} (\bibinfo{year}{2013}).
+
+\bibitem{lobbezoo2018international}
+\bibinfo{author}{Lobbezoo, F.} \emph{et~al.}
+\newblock \bibinfo{title}{International consensus on the assessment of bruxism:
+  Report of a work in progress}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{45}}, \bibinfo{pages}{837--844}
+  (\bibinfo{year}{2018}).
+
+\bibitem{verhoeff2025definitions}
+\bibinfo{author}{Verhoeff, M.~C.} \emph{et~al.}
+\newblock \bibinfo{title}{Updating the bruxism definitions: Report of an
+  international consensus meeting}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{52}}, \bibinfo{pages}{1335--1342}
+  (\bibinfo{year}{2025}).
+
+\bibitem{manfredini2022bruxism}
+\bibinfo{author}{Manfredini, D.}, \bibinfo{author}{Ahlberg, J.} \&
+  \bibinfo{author}{Lobbezoo, F.}
+\newblock \bibinfo{title}{Bruxism definition: Past, present, and future---what
+  should a prosthodontist know?}
+\newblock \emph{\bibinfo{journal}{The Journal of Prosthetic Dentistry}}
+  \textbf{\bibinfo{volume}{128}}, \bibinfo{pages}{905--912}
+  (\bibinfo{year}{2022}).
+
+\bibitem{manfredini2024standardised}
+\bibinfo{author}{Manfredini, D.} \emph{et~al.}
+\newblock \bibinfo{title}{Standardised tool for the assessment of bruxism}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{51}}, \bibinfo{pages}{29--58}
+  (\bibinfo{year}{2024}).
+
+\bibitem{farella2008masticatory}
+\bibinfo{author}{Farella, M.}, \bibinfo{author}{Palla, S.},
+  \bibinfo{author}{Erni, S.}, \bibinfo{author}{Michelotti, A.} \&
+  \bibinfo{author}{Gallo, L.~M.}
+\newblock \bibinfo{title}{Masticatory muscle activity during deliberately
+  performed oral tasks}.
+\newblock \emph{\bibinfo{journal}{Physiological measurement}}
+  \textbf{\bibinfo{volume}{29}}, \bibinfo{pages}{1397--1410}
+  (\bibinfo{year}{2008}).
+
+\bibitem{lavigne2008bruxism}
+\bibinfo{author}{Lavigne, G.~J.}, \bibinfo{author}{Khoury, S.},
+  \bibinfo{author}{Abe, S.}, \bibinfo{author}{Yamaguchi, T.} \&
+  \bibinfo{author}{Raphael, K.}
+\newblock \bibinfo{title}{Bruxism physiology and pathology: An overview for
+  clinicians}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{35}}, \bibinfo{pages}{476--494}
+  (\bibinfo{year}{2008}).
+
+\bibitem{manfredini2013epidemiology}
+\bibinfo{author}{Manfredini, D.}, \bibinfo{author}{Winocur, E.},
+  \bibinfo{author}{Guarda-Nardini, L.}, \bibinfo{author}{Paesani, D.} \&
+  \bibinfo{author}{Lobbezoo, F.}
+\newblock \bibinfo{title}{Epidemiology of bruxism in adults: A systematic
+  review of the literature}.
+\newblock \emph{\bibinfo{journal}{Journal of Orofacial Pain}}
+  \textbf{\bibinfo{volume}{27}}, \bibinfo{pages}{99--110}
+  (\bibinfo{year}{2013}).
+
+\bibitem{melo2019bruxism}
+\bibinfo{author}{Melo, G.} \emph{et~al.}
+\newblock \bibinfo{title}{Bruxism: An umbrella review of systematic reviews}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{46}}, \bibinfo{pages}{666--690}
+  (\bibinfo{year}{2019}).
+
+\bibitem{wetselaar2019prevalence}
+\bibinfo{author}{Wetselaar, P.}, \bibinfo{author}{Vermaire, E. J.~H.},
+  \bibinfo{author}{Lobbezoo, F.} \& \bibinfo{author}{Schuller, A.~A.}
+\newblock \bibinfo{title}{The prevalence of awake bruxism and sleep bruxism in
+  the {D}utch adult population}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{46}}, \bibinfo{pages}{617--623}
+  (\bibinfo{year}{2019}).
+
+\bibitem{lavigne1996sleep}
+\bibinfo{author}{Lavigne, G.~J.}, \bibinfo{author}{Romp{\'e}, P.~H.} \&
+  \bibinfo{author}{Montplaisir, J.~Y.}
+\newblock \bibinfo{title}{Sleep bruxism: Validity of clinical research
+  diagnostic criteria in a controlled polysomnographic study}.
+\newblock \emph{\bibinfo{journal}{Journal of Dental Research}}
+  \textbf{\bibinfo{volume}{75}}, \bibinfo{pages}{546--552}
+  (\bibinfo{year}{1996}).
+
+\bibitem{stuginski2016detection}
+\bibinfo{author}{Stuginski-Barbosa, J.}, \bibinfo{author}{Porporatti, A.~L.},
+  \bibinfo{author}{Costa, Y.~M.}, \bibinfo{author}{Svensson, P.} \&
+  \bibinfo{author}{Conti, P. C.~R.}
+\newblock \bibinfo{title}{Agreement of the {International Classification of
+  Sleep Disorders} criteria with polysomnography for sleep bruxism diagnosis}.
+\newblock \emph{\bibinfo{journal}{The Journal of Prosthetic Dentistry}}
+  \textbf{\bibinfo{volume}{117}}, \bibinfo{pages}{61--66}
+  (\bibinfo{year}{2017}).
+
+\bibitem{casett2017validity}
+\bibinfo{author}{Casett, E.} \emph{et~al.}
+\newblock \bibinfo{title}{Validity of different tools to assess sleep bruxism:
+  A meta-analysis}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{44}}, \bibinfo{pages}{722--734}
+  (\bibinfo{year}{2017}).
+
+\bibitem{bracci2018frequency}
+\bibinfo{author}{Bracci, A.} \emph{et~al.}
+\newblock \bibinfo{title}{Frequency of awake bruxism behaviours in the natural
+  environment. a 7-day, multiple-point observation of real-time report in
+  healthy young adults}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{45}}, \bibinfo{pages}{423--429}
+  (\bibinfo{year}{2018}).
+
+\bibitem{zani2019ecological}
+\bibinfo{author}{Zani, A.}, \bibinfo{author}{Lobbezoo, F.},
+  \bibinfo{author}{Bracci, A.}, \bibinfo{author}{Ahlberg, J.} \&
+  \bibinfo{author}{Manfredini, D.}
+\newblock \bibinfo{title}{Ecological momentary assessment and intervention
+  principles for the study of awake bruxism behaviors, part 1: General
+  principles and preliminary data on healthy young {I}talian adults}.
+\newblock \emph{\bibinfo{journal}{Frontiers in Neurology}}
+  \textbf{\bibinfo{volume}{10}}, \bibinfo{pages}{169} (\bibinfo{year}{2019}).
+
+\bibitem{castroflorio2013use}
+\bibinfo{author}{Castroflorio, T.}, \bibinfo{author}{Mesin, L.},
+  \bibinfo{author}{Tartaglia, G.~M.}, \bibinfo{author}{Sforza, C.} \&
+  \bibinfo{author}{Farina, D.}
+\newblock \bibinfo{title}{Use of electromyographic and electrocardiographic
+  signals to detect sleep bruxism episodes in a natural environment}.
+\newblock \emph{\bibinfo{journal}{IEEE Journal of Biomedical and Health
+  Informatics}} \textbf{\bibinfo{volume}{17}}, \bibinfo{pages}{994--1001}
+  (\bibinfo{year}{2013}).
+
+\bibitem{castroflorio2014detection}
+\bibinfo{author}{Castroflorio, T.}, \bibinfo{author}{Deregibus, A.},
+  \bibinfo{author}{Bargellini, A.}, \bibinfo{author}{Debernardi, C.} \&
+  \bibinfo{author}{Manfredini, D.}
+\newblock \bibinfo{title}{Detection of sleep bruxism: Comparison between an
+  electromyographic and electrocardiographic portable holter and
+  polysomnography}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{41}}, \bibinfo{pages}{163--169}
+  (\bibinfo{year}{2014}).
+
+\bibitem{lobbezoo2020consensus}
+\bibinfo{author}{Lobbezoo, F.} \emph{et~al.}
+\newblock \bibinfo{title}{Consensus-based clinical guidelines for ambulatory
+  electromyography and contingent electrical stimulation in sleep bruxism}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{47}}, \bibinfo{pages}{164--169}
+  (\bibinfo{year}{2020}).
+
+\bibitem{sonmezocak2021detection}
+\bibinfo{author}{Sonmezocak, T.} \& \bibinfo{author}{Kurt, S.}
+\newblock \bibinfo{title}{Detection of {EMG} signals by neural networks using
+  autoregression and wavelet entropy for bruxism diagnosis}.
+\newblock \emph{\bibinfo{journal}{Elektronika ir Elektrotechnika}}
+  \textbf{\bibinfo{volume}{27}}, \bibinfo{pages}{11--21}
+  (\bibinfo{year}{2021}).
+
+\bibitem{gul2024advanced}
+\bibinfo{author}{Gul, J.~Z.}, \bibinfo{author}{Yang, B.-S.},
+  \bibinfo{author}{Kuo, Y.-C.}, \bibinfo{author}{Hsu, W.-H.} \&
+  \bibinfo{author}{Su, F.-C.}
+\newblock \bibinfo{title}{Advanced sensing system for sleep bruxism across
+  multiple postures via {EMG} and machine learning}.
+\newblock \emph{\bibinfo{journal}{Sensors}} \textbf{\bibinfo{volume}{24}},
+  \bibinfo{pages}{5426} (\bibinfo{year}{2024}).
+
+\bibitem{heyat2020computational}
+\bibinfo{author}{Heyat, M. B.~B.} \emph{et~al.}
+\newblock \bibinfo{title}{Computational ensemble expert system classification
+  for the recognition of bruxism using physiological signals}.
+\newblock \emph{\bibinfo{journal}{Applied Sciences}}
+  \textbf{\bibinfo{volume}{10}}, \bibinfo{pages}{7410} (\bibinfo{year}{2020}).
+
+\bibitem{lan2022comparative}
+\bibinfo{author}{Lan, K.-W.}, \bibinfo{author}{Jiang, L.-L.} \&
+  \bibinfo{author}{Yan, Y.}
+\newblock \bibinfo{title}{Comparative study of surface electromyography of
+  masticatory muscles in patients with different types of bruxism}.
+\newblock \emph{\bibinfo{journal}{World Journal of Clinical Cases}}
+  \textbf{\bibinfo{volume}{10}}, \bibinfo{pages}{6876--6889}
+  (\bibinfo{year}{2022}).
+
+\bibitem{martinot2021artificial}
+\bibinfo{author}{Martinot, J.-B.} \emph{et~al.}
+\newblock \bibinfo{title}{Artificial intelligence analysis of mandibular
+  movements enables accurate detection of phasic sleep bruxism in {OSA}
+  patients: A pilot study}.
+\newblock \emph{\bibinfo{journal}{Nature and Science of Sleep}}
+  \textbf{\bibinfo{volume}{13}}, \bibinfo{pages}{1449--1459}
+  (\bibinfo{year}{2021}).
+
+\bibitem{patwa2017bruxism}
+\bibinfo{author}{Patwa, A.~N.} \& \bibinfo{author}{Patwa, M.~N.}
+\newblock \bibinfo{title}{Bruxism detection system with chin-mounted
+  accelerometer sensor} (\bibinfo{year}{2017}).
+\newblock \bibinfo{note}{US Patent Application 2017/0265801}.
+
+\bibitem{haugland2020automatic}
+\bibinfo{author}{Haugland, M.}, \bibinfo{author}{Christiansen, C.} \&
+  \bibinfo{author}{Takano, N.}
+\newblock \bibinfo{title}{Automatic detection of teeth clenching and/or teeth
+  grinding} (\bibinfo{year}{2020}).
+\newblock \bibinfo{note}{US Patent 10,736,560}.
+
+\bibitem{romano2024wearable}
+\bibinfo{author}{Romano, F.}, \bibinfo{author}{Catapano, S.},
+  \bibinfo{author}{Alovisi, M.} \emph{et~al.}
+\newblock \bibinfo{title}{Toward wearables for bruxism detection: Voluntary
+  oral behaviors sound recorded across the head depend on transducer
+  placement}.
+\newblock \emph{\bibinfo{journal}{Clinical and Experimental Dental Research}}
+  \textbf{\bibinfo{volume}{10}}, \bibinfo{pages}{e70001}
+  (\bibinfo{year}{2024}).
+
+\bibitem{mallat1989theory}
+\bibinfo{author}{Mallat, S.~G.}
+\newblock \bibinfo{title}{A theory for multiresolution signal decomposition:
+  The wavelet representation}.
+\newblock \emph{\bibinfo{journal}{IEEE Transactions on Pattern Analysis and
+  Machine Intelligence}} \textbf{\bibinfo{volume}{11}},
+  \bibinfo{pages}{674--693} (\bibinfo{year}{1989}).
+
+\bibitem{daubechies1992ten}
+\bibinfo{author}{Daubechies, I.}
+\newblock \emph{\bibinfo{title}{Ten Lectures on Wavelets}}
+  (\bibinfo{publisher}{Society for Industrial and Applied Mathematics},
+  \bibinfo{address}{Philadelphia, PA}, \bibinfo{year}{1992}).
+
+\bibitem{englehart2003robust}
+\bibinfo{author}{Englehart, K.} \& \bibinfo{author}{Hudgins, B.}
+\newblock \bibinfo{title}{A robust, real-time control scheme for multifunction
+  myoelectric control}.
+\newblock \emph{\bibinfo{journal}{IEEE Transactions on Biomedical Engineering}}
+  \textbf{\bibinfo{volume}{50}}, \bibinfo{pages}{848--854}
+  (\bibinfo{year}{2003}).
+
+\bibitem{phinyomark2012feature}
+\bibinfo{author}{Phinyomark, A.}, \bibinfo{author}{Phukpattaranont, P.} \&
+  \bibinfo{author}{Limsakul, C.}
+\newblock \bibinfo{title}{Feature reduction and selection for {EMG} signal
+  classification}.
+\newblock \emph{\bibinfo{journal}{Expert Systems with Applications}}
+  \textbf{\bibinfo{volume}{39}}, \bibinfo{pages}{7420--7431}
+  (\bibinfo{year}{2012}).
+
+\bibitem{bharathi2025unveiling}
+\bibinfo{author}{Bharathi, B. M.~R.}, \bibinfo{author}{Balaji, N.~S.},
+  \bibinfo{author}{Meena, R.} \& \bibinfo{author}{Sekar, M. R.~C.}
+\newblock \bibinfo{title}{Unveiling optimal mother wavelets by {COPRAS} method:
+  Analyzing speech signals despite face mask and shield obstacles}.
+\newblock \emph{\bibinfo{journal}{Scientific Reports}}
+  \textbf{\bibinfo{volume}{15}}, \bibinfo{pages}{14044} (\bibinfo{year}{2025}).
+
+\bibitem{chowdhury2013surface}
+\bibinfo{author}{Chowdhury, R.~H.} \emph{et~al.}
+\newblock \bibinfo{title}{Surface electromyography signal processing and
+  classification techniques}.
+\newblock \emph{\bibinfo{journal}{Sensors}} \textbf{\bibinfo{volume}{13}},
+  \bibinfo{pages}{12431--12466} (\bibinfo{year}{2013}).
+
+\bibitem{deluca2010filtering}
+\bibinfo{author}{De~Luca, C.~J.}, \bibinfo{author}{Gilmore, L.~D.},
+  \bibinfo{author}{Kuznetsov, M.} \& \bibinfo{author}{Roy, S.~H.}
+\newblock \bibinfo{title}{Filtering the surface {EMG} signal: Movement artifact
+  and baseline noise contamination}.
+\newblock \emph{\bibinfo{journal}{Journal of Biomechanics}}
+  \textbf{\bibinfo{volume}{43}}, \bibinfo{pages}{1573--1579}
+  (\bibinfo{year}{2010}).
+
+\bibitem{clancy2002sampling}
+\bibinfo{author}{Clancy, E.~A.}, \bibinfo{author}{Morin, E.~L.} \&
+  \bibinfo{author}{Merletti, R.}
+\newblock \bibinfo{title}{Sampling, noise-reduction and amplitude estimation
+  issues in surface electromyography}.
+\newblock \emph{\bibinfo{journal}{Journal of Electromyography and Kinesiology}}
+  \textbf{\bibinfo{volume}{12}}, \bibinfo{pages}{1--16} (\bibinfo{year}{2002}).
+
+\bibitem{merletti2020tutorial}
+\bibinfo{author}{Merletti, R.} \& \bibinfo{author}{Cerone, G.~L.}
+\newblock \bibinfo{title}{Tutorial. surface {EMG} detection, conditioning and
+  pre-processing: Best practices}.
+\newblock \emph{\bibinfo{journal}{Journal of Electromyography and Kinesiology}}
+  \textbf{\bibinfo{volume}{54}}, \bibinfo{pages}{102440}
+  (\bibinfo{year}{2020}).
+
+\bibitem{boyer2023reducing}
+\bibinfo{author}{Boyer, M.}, \bibinfo{author}{Bouyer, L.},
+  \bibinfo{author}{Roy, J.-S.} \& \bibinfo{author}{Campeau-Lecours, A.}
+\newblock \bibinfo{title}{Reducing noise, artifacts and interference in
+  single-channel {EMG} signals: A review}.
+\newblock \emph{\bibinfo{journal}{Sensors}} \textbf{\bibinfo{volume}{23}},
+  \bibinfo{pages}{2927} (\bibinfo{year}{2023}).
+
+\bibitem{vanboxtel2001optimal}
+\bibinfo{author}{van Boxtel, A.}
+\newblock \bibinfo{title}{Optimal signal bandwidth for the recording of surface
+  {EMG} activity of facial, jaw, oral, and neck muscles}.
+\newblock \emph{\bibinfo{journal}{Psychophysiology}}
+  \textbf{\bibinfo{volume}{38}}, \bibinfo{pages}{22--34}
+  (\bibinfo{year}{2001}).
+
+\bibitem{isek1999standards}
+\bibinfo{author}{{International Society of Electrophysiology and Kinesiology}}.
+\newblock \bibinfo{title}{Standards for reporting {EMG} data}.
+\newblock \bibinfo{howpublished}{ISEK standards document, prepared by R.
+  Merletti} (\bibinfo{year}{1999}).
+\newblock \bibinfo{note}{\url{https://isek.org/emg-standards/}}.
+
+\bibitem{hermens2000development}
+\bibinfo{author}{Hermens, H.~J.}, \bibinfo{author}{Freriks, B.},
+  \bibinfo{author}{Disselhorst-Klug, C.} \& \bibinfo{author}{Rau, G.}
+\newblock \bibinfo{title}{Development of recommendations for {SEMG} sensors and
+  sensor placement procedures}.
+\newblock \emph{\bibinfo{journal}{Journal of Electromyography and Kinesiology}}
+  \textbf{\bibinfo{volume}{10}}, \bibinfo{pages}{361--374}
+  (\bibinfo{year}{2000}).
+
+\bibitem{besomi2019consensus}
+\bibinfo{author}{Besomi, M.} \emph{et~al.}
+\newblock \bibinfo{title}{Consensus for experimental design in electromyography
+  ({CEDE}) project: Electrode selection matrix}.
+\newblock \emph{\bibinfo{journal}{Journal of Electromyography and Kinesiology}}
+  \textbf{\bibinfo{volume}{48}}, \bibinfo{pages}{128--144}
+  (\bibinfo{year}{2019}).
+
+\bibitem{besomi2020consensus}
+\bibinfo{author}{Besomi, M.} \emph{et~al.}
+\newblock \bibinfo{title}{Consensus for experimental design in electromyography
+  ({CEDE}) project: Amplitude normalization matrix}.
+\newblock \emph{\bibinfo{journal}{Journal of Electromyography and Kinesiology}}
+  \textbf{\bibinfo{volume}{53}}, \bibinfo{pages}{102438}
+  (\bibinfo{year}{2020}).
+
+\bibitem{merletti2019tutorial}
+\bibinfo{author}{Merletti, R.} \& \bibinfo{author}{Muceli, S.}
+\newblock \bibinfo{title}{Tutorial. surface {EMG} detection in space and time:
+  Best practices}.
+\newblock \emph{\bibinfo{journal}{Journal of Electromyography and Kinesiology}}
+  \textbf{\bibinfo{volume}{49}}, \bibinfo{pages}{102363}
+  (\bibinfo{year}{2019}).
+
+\bibitem{deluca1997use}
+\bibinfo{author}{De~Luca, C.~J.}
+\newblock \bibinfo{title}{The use of surface electromyography in biomechanics}.
+\newblock \emph{\bibinfo{journal}{Journal of Applied Biomechanics}}
+  \textbf{\bibinfo{volume}{13}}, \bibinfo{pages}{135--163}
+  (\bibinfo{year}{1997}).
+
+\bibitem{faust2018deep}
+\bibinfo{author}{Faust, O.}, \bibinfo{author}{Hagiwara, Y.},
+  \bibinfo{author}{Hong, T.~J.}, \bibinfo{author}{Lih, O.~S.} \&
+  \bibinfo{author}{Acharya, U.~R.}
+\newblock \bibinfo{title}{Deep learning for healthcare applications based on
+  physiological signals: A review}.
+\newblock \emph{\bibinfo{journal}{Computer Methods and Programs in
+  Biomedicine}} \textbf{\bibinfo{volume}{161}}, \bibinfo{pages}{1--13}
+  (\bibinfo{year}{2018}).
+
+\bibitem{craik2019deep}
+\bibinfo{author}{Craik, A.}, \bibinfo{author}{He, Y.}, \bibinfo{author}{Bhugra,
+  S.}, \bibinfo{author}{Bhattacharyya, S.} \emph{et~al.}
+\newblock \bibinfo{title}{Deep learning for electroencephalogram ({EEG})
+  classification tasks: A review}.
+\newblock \emph{\bibinfo{journal}{Journal of Neural Engineering}}
+  \textbf{\bibinfo{volume}{16}}, \bibinfo{pages}{031001}
+  (\bibinfo{year}{2019}).
+
+\bibitem{tsinganos2019improved}
+\bibinfo{author}{Tsinganos, P.}, \bibinfo{author}{Cornelis, B.},
+  \bibinfo{author}{Cornelis, J.}, \bibinfo{author}{Jansen, B.} \&
+  \bibinfo{author}{Weiss, A.}
+\newblock \bibinfo{title}{Improved gesture recognition based on {sEMG} signals
+  and {TCN}}.
+\newblock \emph{\bibinfo{journal}{IEEE Access}} \textbf{\bibinfo{volume}{7}},
+  \bibinfo{pages}{154853--154863} (\bibinfo{year}{2019}).
+
+\bibitem{rim2020deep}
+\bibinfo{author}{Rim, B.}, \bibinfo{author}{Sung, N.-J.}, \bibinfo{author}{Min,
+  S.} \& \bibinfo{author}{Hong, M.}
+\newblock \bibinfo{title}{Deep learning in physiological signal data: A
+  survey}.
+\newblock \emph{\bibinfo{journal}{Sensors}} \textbf{\bibinfo{volume}{20}},
+  \bibinfo{pages}{969} (\bibinfo{year}{2020}).
+
+\bibitem{kiranyaz20211d}
+\bibinfo{author}{Kiranyaz, S.} \emph{et~al.}
+\newblock \bibinfo{title}{1{D} convolutional neural networks and applications:
+  A survey}.
+\newblock \emph{\bibinfo{journal}{Mechanical Systems and Signal Processing}}
+  \textbf{\bibinfo{volume}{151}}, \bibinfo{pages}{107398}
+  (\bibinfo{year}{2021}).
+
+\bibitem{ismailfawaz2019deep}
+\bibinfo{author}{Ismail~Fawaz, H.}, \bibinfo{author}{Forestier, G.},
+  \bibinfo{author}{Weber, J.}, \bibinfo{author}{Idoumghar, L.} \&
+  \bibinfo{author}{Muller, P.-A.}
+\newblock \bibinfo{title}{Deep learning for time series classification: A
+  review}.
+\newblock \emph{\bibinfo{journal}{Data Mining and Knowledge Discovery}}
+  \textbf{\bibinfo{volume}{33}}, \bibinfo{pages}{917--963}
+  (\bibinfo{year}{2019}).
+
+\bibitem{atzori2014electromyography}
+\bibinfo{author}{Atzori, M.} \emph{et~al.}
+\newblock \bibinfo{title}{Electromyography data for non-invasive
+  naturally-controlled robotic hand prostheses}.
+\newblock \emph{\bibinfo{journal}{Scientific Data}}
+  \textbf{\bibinfo{volume}{1}}, \bibinfo{pages}{140053} (\bibinfo{year}{2014}).
+
+\bibitem{atzori2016deep}
+\bibinfo{author}{Atzori, M.}, \bibinfo{author}{Cognolato, M.} \&
+  \bibinfo{author}{M{\"u}ller, H.}
+\newblock \bibinfo{title}{Deep learning with convolutional neural networks
+  applied to electromyography data: A resource for the classification of
+  movements for prosthetic hands}.
+\newblock \emph{\bibinfo{journal}{Frontiers in Neurorobotics}}
+  \textbf{\bibinfo{volume}{10}}, \bibinfo{pages}{9} (\bibinfo{year}{2016}).
+
+\bibitem{coteallard2019deep}
+\bibinfo{author}{C{\^o}t{\'e}-Allard, U.} \emph{et~al.}
+\newblock \bibinfo{title}{Deep learning for electromyographic hand gesture
+  signal classification using transfer learning}.
+\newblock \emph{\bibinfo{journal}{IEEE Transactions on Neural Systems and
+  Rehabilitation Engineering}} \textbf{\bibinfo{volume}{27}},
+  \bibinfo{pages}{760--771} (\bibinfo{year}{2019}).
+
+\bibitem{jiang2012myoelectric}
+\bibinfo{author}{Jiang, N.}, \bibinfo{author}{Dosen, S.},
+  \bibinfo{author}{Muller, K.-R.} \& \bibinfo{author}{Farina, D.}
+\newblock \bibinfo{title}{Myoelectric control of artificial limbs: Is there a
+  need to change focus?}
+\newblock \emph{\bibinfo{journal}{IEEE Signal Processing Magazine}}
+  \textbf{\bibinfo{volume}{29}}, \bibinfo{pages}{148--152}
+  (\bibinfo{year}{2012}).
+
+\bibitem{phinyomark2018emg}
+\bibinfo{author}{Phinyomark, A.} \& \bibinfo{author}{Scheme, E.}
+\newblock \bibinfo{title}{{EMG} pattern recognition in the era of big data and
+  deep learning}.
+\newblock \emph{\bibinfo{journal}{Big Data and Cognitive Computing}}
+  \textbf{\bibinfo{volume}{2}}, \bibinfo{pages}{21} (\bibinfo{year}{2018}).
+
+\bibitem{wei2019multistream}
+\bibinfo{author}{Wei, W.} \emph{et~al.}
+\newblock \bibinfo{title}{A multi-stream convolutional neural network for
+  {sEMG}-based gesture recognition in muscle-computer interface}.
+\newblock \emph{\bibinfo{journal}{Pattern Recognition Letters}}
+  \textbf{\bibinfo{volume}{119}}, \bibinfo{pages}{131--138}
+  (\bibinfo{year}{2019}).
+
+\bibitem{lin2017focal}
+\bibinfo{author}{Lin, T.-Y.}, \bibinfo{author}{Goyal, P.},
+  \bibinfo{author}{Girshick, R.}, \bibinfo{author}{He, K.} \&
+  \bibinfo{author}{Doll{\'a}r, P.}
+\newblock \bibinfo{title}{Focal loss for dense object detection}.
+\newblock \emph{\bibinfo{journal}{Proceedings of the IEEE International
+  Conference on Computer Vision (ICCV)}} \bibinfo{pages}{2980--2988}
+  (\bibinfo{year}{2017}).
+
+\bibitem{johnson2019survey}
+\bibinfo{author}{Johnson, J.~M.} \& \bibinfo{author}{Khoshgoftaar, T.~M.}
+\newblock \bibinfo{title}{Survey on deep learning with class imbalance}.
+\newblock \emph{\bibinfo{journal}{Journal of Big Data}}
+  \textbf{\bibinfo{volume}{6}}, \bibinfo{pages}{1--54} (\bibinfo{year}{2019}).
+
+\bibitem{mewett2004reducing}
+\bibinfo{author}{Mewett, D.~T.}, \bibinfo{author}{Reynolds, K.~J.} \&
+  \bibinfo{author}{Nazeran, H.}
+\newblock \bibinfo{title}{Reducing power line interference in digitised
+  electromyogram recordings by spectrum interpolation}.
+\newblock \emph{\bibinfo{journal}{Medical \& Biological Engineering \&
+  Computing}} \textbf{\bibinfo{volume}{42}}, \bibinfo{pages}{524--531}
+  (\bibinfo{year}{2004}).
+
+\bibitem{levkov2005removal}
+\bibinfo{author}{Levkov, C.} \emph{et~al.}
+\newblock \bibinfo{title}{Removal of power-line interference from the {ECG}: A
+  review of the subtraction procedure}.
+\newblock \emph{\bibinfo{journal}{BioMedical Engineering OnLine}}
+  \textbf{\bibinfo{volume}{4}}, \bibinfo{pages}{50} (\bibinfo{year}{2005}).
+
+\bibitem{keshtkaran2014fast}
+\bibinfo{author}{Keshtkaran, M.~R.} \& \bibinfo{author}{Yang, Z.}
+\newblock \bibinfo{title}{A fast, robust algorithm for power line interference
+  cancellation in neural recording}.
+\newblock \emph{\bibinfo{journal}{Journal of Neural Engineering}}
+  \textbf{\bibinfo{volume}{11}}, \bibinfo{pages}{026017}
+  (\bibinfo{year}{2014}).
+
+\bibitem{sornmo2005bioelectrical}
+\bibinfo{author}{S{\"o}rnmo, L.} \& \bibinfo{author}{Laguna, P.}
+\newblock \emph{\bibinfo{title}{Bioelectrical Signal Processing in Cardiac and
+  Neurological Applications}}  (\bibinfo{publisher}{Elsevier Academic Press},
+  \bibinfo{address}{Amsterdam}, \bibinfo{year}{2005}).
+
+\bibitem{collins2024tripod}
+\bibinfo{author}{Collins, G.~S.} \emph{et~al.}
+\newblock \bibinfo{title}{{TRIPOD+AI} statement: Updated guidance for reporting
+  clinical prediction models that use regression or machine learning methods}.
+\newblock \emph{\bibinfo{journal}{BMJ}} \textbf{\bibinfo{volume}{385}},
+  \bibinfo{pages}{e078378} (\bibinfo{year}{2024}).
+
+\bibitem{kapoor2023leakage}
+\bibinfo{author}{Kapoor, S.} \& \bibinfo{author}{Narayanan, A.}
+\newblock \bibinfo{title}{Leakage and the reproducibility crisis in
+  machine-learning-based science}.
+\newblock \emph{\bibinfo{journal}{Patterns}} \textbf{\bibinfo{volume}{4}},
+  \bibinfo{pages}{100804} (\bibinfo{year}{2023}).
+
+\bibitem{varoquaux2022machine}
+\bibinfo{author}{Varoquaux, G.} \& \bibinfo{author}{Cheplygina, V.}
+\newblock \bibinfo{title}{Machine learning for medical imaging: Methodological
+  failures and recommendations for the future}.
+\newblock \emph{\bibinfo{journal}{npj Digital Medicine}}
+  \textbf{\bibinfo{volume}{5}}, \bibinfo{pages}{48} (\bibinfo{year}{2022}).
+
+\bibitem{pineau2021improving}
+\bibinfo{author}{Pineau, J.} \emph{et~al.}
+\newblock \bibinfo{title}{Improving reproducibility in machine learning
+  research (a report from the {N}eur{IPS} 2019 reproducibility program)}.
+\newblock \emph{\bibinfo{journal}{Journal of Machine Learning Research}}
+  \textbf{\bibinfo{volume}{22}}, \bibinfo{pages}{1--20} (\bibinfo{year}{2021}).
+
+\bibitem{ferrario2000electromyographic}
+\bibinfo{author}{Ferrario, V.~F.}, \bibinfo{author}{Sforza, C.},
+  \bibinfo{author}{Colombo, A.} \& \bibinfo{author}{Ciano, V.}
+\newblock \bibinfo{title}{An electromyographic investigation of masticatory
+  muscles symmetry in normo-occlusion subjects}.
+\newblock \emph{\bibinfo{journal}{Journal of Oral Rehabilitation}}
+  \textbf{\bibinfo{volume}{27}}, \bibinfo{pages}{33--40}
+  (\bibinfo{year}{2000}).
+
+\bibitem{castroflorio2005reproducibility}
+\bibinfo{author}{Castroflorio, T.} \emph{et~al.}
+\newblock \bibinfo{title}{Reproducibility of surface {EMG} in the human
+  masseter and anterior temporalis muscle areas}.
+\newblock \emph{\bibinfo{journal}{CRANIO: The Journal of Craniomandibular \&
+  Sleep Practice}} \textbf{\bibinfo{volume}{23}}, \bibinfo{pages}{130--137}
+  (\bibinfo{year}{2005}).
+
+\bibitem{saeb2017need}
+\bibinfo{author}{Saeb, S.}, \bibinfo{author}{Lonini, L.},
+  \bibinfo{author}{Jayaraman, A.}, \bibinfo{author}{Mohr, D.~C.} \&
+  \bibinfo{author}{Kording, K.~P.}
+\newblock \bibinfo{title}{The need to approximate the use-case in clinical
+  machine learning}.
+\newblock \emph{\bibinfo{journal}{GigaScience}} \textbf{\bibinfo{volume}{6}},
+  \bibinfo{pages}{gix019} (\bibinfo{year}{2017}).
+
+\bibitem{little2017using}
+\bibinfo{author}{Little, M.~A.} \emph{et~al.}
+\newblock \bibinfo{title}{Using and understanding cross-validation strategies.
+  perspectives on {Saeb} et al.}
+\newblock \emph{\bibinfo{journal}{GigaScience}} \textbf{\bibinfo{volume}{6}},
+  \bibinfo{pages}{gix020} (\bibinfo{year}{2017}).
+
+\bibitem{roberts2017cross}
+\bibinfo{author}{Roberts, D.~R.} \emph{et~al.}
+\newblock \bibinfo{title}{Cross-validation strategies for data with temporal,
+  spatial, hierarchical, or phylogenetic structure}.
+\newblock \emph{\bibinfo{journal}{Ecography}} \textbf{\bibinfo{volume}{40}},
+  \bibinfo{pages}{913--929} (\bibinfo{year}{2017}).
+
+\bibitem{loshchilov2019decoupled}
+\bibinfo{author}{Loshchilov, I.} \& \bibinfo{author}{Hutter, F.}
+\newblock \bibinfo{title}{Decoupled weight decay regularization}.
+\newblock \emph{\bibinfo{journal}{Proceedings of the 7th International
+  Conference on Learning Representations (ICLR)}}  (\bibinfo{year}{2019}).
+
+\bibitem{paszke2019pytorch}
+\bibinfo{author}{Paszke, A.} \emph{et~al.}
+\newblock \bibinfo{title}{{PyTorch}: An imperative style, high-performance deep
+  learning library}.
+\newblock \emph{\bibinfo{journal}{Advances in Neural Information Processing
+  Systems}} \textbf{\bibinfo{volume}{32}}, \bibinfo{pages}{8024--8035}
+  (\bibinfo{year}{2019}).
+
+\bibitem{cawley2010overfitting}
+\bibinfo{author}{Cawley, G.~C.} \& \bibinfo{author}{Talbot, N. L.~C.}
+\newblock \bibinfo{title}{On over-fitting in model selection and subsequent
+  selection bias in performance evaluation}.
+\newblock \emph{\bibinfo{journal}{Journal of Machine Learning Research}}
+  \textbf{\bibinfo{volume}{11}}, \bibinfo{pages}{2079--2107}
+  (\bibinfo{year}{2010}).
+
+\bibitem{varma2006bias}
+\bibinfo{author}{Varma, S.} \& \bibinfo{author}{Simon, R.}
+\newblock \bibinfo{title}{Bias in error estimation when using cross-validation
+  for model selection}.
+\newblock \emph{\bibinfo{journal}{BMC Bioinformatics}}
+  \textbf{\bibinfo{volume}{7}}, \bibinfo{pages}{91} (\bibinfo{year}{2006}).
+
+\bibitem{chicco2020advantages}
+\bibinfo{author}{Chicco, D.} \& \bibinfo{author}{Jurman, G.}
+\newblock \bibinfo{title}{The advantages of the {M}atthews correlation
+  coefficient ({MCC}) over {F1} score and accuracy in binary classification
+  evaluation}.
+\newblock \emph{\bibinfo{journal}{BMC Genomics}} \textbf{\bibinfo{volume}{21}},
+  \bibinfo{pages}{6} (\bibinfo{year}{2020}).
+
+\bibitem{lehmann2006testing}
+\bibinfo{author}{Lehmann, E.~L.} \& \bibinfo{author}{Romano, J.~P.}
+\newblock \emph{\bibinfo{title}{Testing statistical hypotheses}}
+  (\bibinfo{publisher}{Springer Science \& Business Media},
+  \bibinfo{address}{New York, NY, USA}, \bibinfo{year}{2006}).
+
+\bibitem{demsar2006statistical}
+\bibinfo{author}{Dem{\v{s}}ar, J.}
+\newblock \bibinfo{title}{Statistical comparisons of classifiers over multiple
+  data sets}.
+\newblock \emph{\bibinfo{journal}{Journal of Machine Learning Research}}
+  \textbf{\bibinfo{volume}{7}}, \bibinfo{pages}{1--30} (\bibinfo{year}{2006}).
+
+\bibitem{guo2017calibration}
+\bibinfo{author}{Guo, C.}, \bibinfo{author}{Pleiss, G.}, \bibinfo{author}{Sun,
+  Y.} \& \bibinfo{author}{Weinberger, K.~Q.}
+\newblock \bibinfo{title}{On calibration of modern neural networks}.
+\newblock \emph{\bibinfo{journal}{Proceedings of the 34th International
+  Conference on Machine Learning, PMLR}} \textbf{\bibinfo{volume}{70}},
+  \bibinfo{pages}{1321--1330} (\bibinfo{year}{2017}).
+
+\bibitem{pedregosa2011scikit}
+\bibinfo{author}{Pedregosa, F.} \emph{et~al.}
+\newblock \bibinfo{title}{Scikit-learn: Machine learning in {Python}}.
+\newblock \emph{\bibinfo{journal}{Journal of Machine Learning Research}}
+  \textbf{\bibinfo{volume}{12}}, \bibinfo{pages}{2825--2830}
+  (\bibinfo{year}{2011}).
+
+\bibitem{saito2015precision}
+\bibinfo{author}{Saito, T.} \& \bibinfo{author}{Rehmsmeier, M.}
+\newblock \bibinfo{title}{The precision-recall plot is more informative than
+  the {ROC} plot when evaluating binary classifiers on imbalanced datasets}.
+\newblock \emph{\bibinfo{journal}{PLOS ONE}} \textbf{\bibinfo{volume}{10}},
+  \bibinfo{pages}{e0118432} (\bibinfo{year}{2015}).
+
+\bibitem{davis2006relationship}
+\bibinfo{author}{Davis, J.} \& \bibinfo{author}{Goadrich, M.}
+\newblock \bibinfo{title}{The relationship between precision-recall and {ROC}
+  curves}.
+\newblock \emph{\bibinfo{journal}{Proceedings of the 23rd International
+  Conference on Machine Learning (ICML)}} \bibinfo{pages}{233--240}
+  (\bibinfo{year}{2006}).
+
+\bibitem{vandermaaten2008visualizing}
+\bibinfo{author}{van~der Maaten, L.} \& \bibinfo{author}{Hinton, G.}
+\newblock \bibinfo{title}{Visualizing data using t-sne}.
+\newblock \emph{\bibinfo{journal}{Journal of Machine Learning Research}}
+  \textbf{\bibinfo{volume}{9}}, \bibinfo{pages}{2579--2605}
+  (\bibinfo{year}{2008}).
+
+\bibitem{wang2022generalizing}
+\bibinfo{author}{Wang, J.} \emph{et~al.}
+\newblock \bibinfo{title}{Generalizing to unseen domains: A survey on domain
+  generalization}.
+\newblock \emph{\bibinfo{journal}{IEEE Transactions on Knowledge and Data
+  Engineering}} \textbf{\bibinfo{volume}{35}}, \bibinfo{pages}{8052--8072}
+  (\bibinfo{year}{2023}).
+
+\bibitem{kouw2021review}
+\bibinfo{author}{Kouw, W.~M.} \& \bibinfo{author}{Loog, M.}
+\newblock \bibinfo{title}{A review of domain adaptation without target labels}.
+\newblock \emph{\bibinfo{journal}{IEEE Transactions on Pattern Analysis and
+  Machine Intelligence}} \textbf{\bibinfo{volume}{43}},
+  \bibinfo{pages}{766--785} (\bibinfo{year}{2021}).
+
+\bibitem{varoquaux2018cross}
+\bibinfo{author}{Varoquaux, G.}
+\newblock \bibinfo{title}{Cross-validation failure: Small sample sizes lead to
+  large error bars}.
+\newblock \emph{\bibinfo{journal}{NeuroImage}} \textbf{\bibinfo{volume}{180}},
+  \bibinfo{pages}{68--77} (\bibinfo{year}{2018}).
+
+\end{thebibliography}

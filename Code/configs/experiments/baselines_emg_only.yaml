@@ -1,0 +1,95 @@
+# RQ3 architecture comparison with matched inputs, SURFACE EMG ONLY.
+#
+#   bruxism-baselines --config configs/experiments/baselines_emg_only.yaml
+#
+# Identical to baselines.yaml except `modality: emg_only`. The microphone channel of the
+# 2025-08 collection is duplicated across participants (audio.md, 2026-08-12), so no
+# reported result may read it; a fusion sweep would measure a defective channel as well as
+# an architecture. Every model here receives the SAME four EMG channels: a table in which
+# the proposed model gets one input set and the baselines get another measures the inputs,
+# not the architecture.
+name: baselines_emg_only
+description: Wavelet CNN (original and temporal) vs early-fusion CNN vs BiLSTM, EMG only, identical inputs.
+task_id: five_class
+model_id: dual_branch_wavelet_cnn
+modality: emg_only
+# dual_branch_temporal_cnn is the Phase 5 architecture: identical wavelet front end, but
+# mean/std/max pooling per band plus a modulation-spectrum head, so burst-relax rhythm is
+# representable at all. The superseded dual_branch_wavelet_cnn stays in the sweep - the
+# comparison is the point, and cause.md 4 is what it looks like when the baseline wins.
+sweep_model_ids: [dual_branch_wavelet_cnn, dual_branch_temporal_cnn, early_fusion_cnn, bilstm]
+
+data:
+  data_root: ../Data
+  sampling_rate_hz: 1200
+  segmentation_policy: trigger_constrained
+  window_seconds: 1.0
+  stride_seconds: 0.5
+  guard_seconds: 0.25
+  startup_guard_seconds: 0.5
+  shutdown_guard_seconds: 0.0
+  allow_trigger_off_as_rest: false
+  emg_channels: null
+  cache_dir: outputs/cache
+
+filters:
+  # SUPERSEDES the 2026-07 chain, which notched 60 Hz and band-passed 20-450 Hz.
+  #
+  # The acquisition hardware had ALREADY removed 60 Hz (`notch_filter: Index 9` in every
+  # metadata sidecar), so that notch removed the one mains frequency that was not there
+  # while 180/300/420 Hz -- 37,000x to 846,000x above the local noise floor -- passed
+  # straight through and made up 85-99 % of the in-band power of the "filtered" signal.
+  # See cause.md and docs/open_questions.md Q9. `emg_mains` expands to one notch per mains
+  # multiple inside the passband (60, 120, 180, 240, 300, 360, 420 Hz) plus the bandpass;
+  # resolved_config.yaml in every run bundle records the expansion.
+  #
+  # Results produced with this chain are NOT comparable to any result produced before it.
+  zero_phase: true          # filtfilt: ACAUSAL / OFFLINE. Not a real-time chain.
+  emg_mains:
+    mains_hz: 60.0
+    notch_harmonics: true   # false reproduces the superseded chain, for regression checks
+    quality: 30.0
+    band_hz: [20.0, 450.0]
+  mic_stages:
+    - {kind: highpass, freq_hz: 20.0, order: 2,
+       rationale: "Remove the large DC offset; no further shaping, the transducer response is undocumented."}
+
+normalization:
+  scope: per_channel
+  method: zscore
+
+augmentation:
+  enabled: true
+  probability: 0.4
+  minority_only: true
+  minority_threshold: 0.7
+  amplitude_scale_range: [0.9, 1.1]
+  noise_std_fraction: 0.02
+  max_shift_samples: 50
+
+selection:
+  objective: macro_f1        # prespecified; imbalance makes accuracy misleading
+  epoch_budget_rule: median
+  min_epochs: 5
+  max_epochs: 60
+  patience: 15
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: adamw
+  loss: focal
+  focal_gamma: 1.5
+  class_weight_scheme: balanced
+  num_workers: 0
+  device: auto
+  deterministic: true
+  seeds: [0, 1, 2]
+  search_space: {}
+
+output:
+  runs_root: outputs/runs
+  save_checkpoints: true
+
+# No microphone acknowledgement keys are needed or wanted here: `modality: emg_only`
+# means no branch reads the microphone channel and no stopband band is consumed.

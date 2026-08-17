@@ -1,0 +1,252 @@
+\relax 
+\bibstyle{sn-nature}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\Newlabel{1}{1}
+\Newlabel{2}{2}
+\Newlabel{3}{3}
+\Newlabel{4}{4}
+\citation{raez2006techniques,colonna2023electromyographic,thymi2021signal}
+\citation{thymi2021signal,cidverdejo2024instrumental}
+\citation{lobbezoo2013bruxism,lobbezoo2018international,verhoeff2025definitions,manfredini2022bruxism}
+\citation{manfredini2024standardised}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{2}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Scope.}{2}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Research questions.}{2}{section*.3}\protected@file@percent }
+\citation{raez2006techniques,farella2008masticatory}
+\citation{lavigne2008bruxism,manfredini2013epidemiology,melo2019bruxism,wetselaar2019prevalence}
+\citation{lavigne1996sleep,stuginski2016detection}
+\citation{casett2017validity,cidverdejo2024instrumental}
+\citation{bracci2018frequency,zani2019ecological}
+\citation{stuginski2016detection}
+\citation{castroflorio2013use,castroflorio2014detection}
+\citation{colonna2023electromyographic}
+\citation{lobbezoo2020consensus}
+\citation{sonmezocak2021detection}
+\citation{gul2024advanced}
+\citation{heyat2020computational}
+\citation{lan2022comparative}
+\citation{martinot2021artificial}
+\citation{patwa2017bruxism}
+\citation{haugland2020automatic}
+\citation{romano2024wearable}
+\citation{cidverdejo2024instrumental}
+\citation{mallat1989theory,daubechies1992ten,englehart2003robust}
+\citation{phinyomark2012feature,bharathi2025unveiling}
+\citation{chowdhury2013surface,deluca2010filtering,clancy2002sampling,merletti2020tutorial,boyer2023reducing}
+\citation{vanboxtel2001optimal}
+\citation{isek1999standards,hermens2000development,besomi2019consensus,besomi2020consensus,merletti2019tutorial,deluca1997use}
+\citation{faust2018deep,craik2019deep,tsinganos2019improved,rim2020deep,kiranyaz20211d,ismailfawaz2019deep}
+\citation{atzori2014electromyography,atzori2016deep,coteallard2019deep,jiang2012myoelectric,phinyomark2018emg,wei2019multistream}
+\citation{lin2017focal,johnson2019survey}
+\citation{chowdhury2013surface,raez2006techniques}
+\citation{mewett2004reducing,levkov2005removal,keshtkaran2014fast,sornmo2005bioelectrical}
+\citation{thymi2021signal}
+\citation{collins2024tripod,kapoor2023leakage,varoquaux2022machine,pineau2021improving}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Prior technical advances}{3}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}EMG-based assessment of masticatory activity}{3}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Signal processing and learned representations}{3}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}The gap this paper addresses}{3}{subsection.2.3}\protected@file@percent }
+\citation{ferrario2000electromyographic,castroflorio2005reproducibility}
+\citation{isek1999standards,besomi2019consensus}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Methods}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Participants, procedure and sensors}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Window labelling and the analysable sample}{4}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:windows}{{3.2}{4}{Window labelling and the analysable sample}{subsection.3.2}{}}
+\citation{saeb2017need,little2017using,roberts2017cross}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces The study. (a) Sensor placement: bipolar surface-EMG pairs over the temporalis (EMG-T) and masseter (EMG-M), with a microphone (MIC) near the temporomandibular joint as an annotation aid; it is not analysed, for the measured reasons in Section~\ref {sec:mic}. (b) Analysable windows per participant and class after the containment, transition-guard and startup-guard exclusions; participants are labelled P1--P5 here and throughout. Class sizes are strongly unequal both between classes---chewing supplies 58.9\%---and between participants within a class, which is why class weighting, minority-only augmentation and participant-level aggregation are all used; Section~\ref {sec:constraints} traces the between-participant inequality to how differently participants marked the trigger.}}{5}{figure.1}\protected@file@percent }
+\newlabel{fig:setup}{{1}{5}{The study. (a) Sensor placement: bipolar surface-EMG pairs over the temporalis (EMG-T) and masseter (EMG-M), with a microphone (MIC) near the temporomandibular joint as an annotation aid; it is not analysed, for the measured reasons in Section~\ref {sec:mic}. (b) Analysable windows per participant and class after the containment, transition-guard and startup-guard exclusions; participants are labelled P1--P5 here and throughout. Class sizes are strongly unequal both between classes---chewing supplies 58.9\%---and between participants within a class, which is why class weighting, minority-only augmentation and participant-level aggregation are all used; Section~\ref {sec:constraints} traces the between-participant inequality to how differently participants marked the trigger}{figure.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Mains interference and the corrected filter chain}{5}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:filter}{{3.3}{5}{Mains interference and the corrected filter chain}{subsection.3.3}{}}
+\citation{vanboxtel2001optimal,deluca2010filtering}
+\citation{mewett2004reducing}
+\citation{besomi2020consensus}
+\citation{daubechies1992ten,englehart2003robust}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Dataset, guards and preprocessing under the trigger-constrained labelling policy.}}{6}{table.1}\protected@file@percent }
+\newlabel{tab:dataset}{{1}{6}{Dataset, guards and preprocessing under the trigger-constrained labelling policy}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Normalisation, wavelet decomposition and model}{6}{subsection.3.4}\protected@file@percent }
+\citation{loshchilov2019decoupled}
+\citation{lin2017focal}
+\citation{paszke2019pytorch}
+\citation{cawley2010overfitting,varma2006bias}
+\citation{chicco2020advantages}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces The mains-harmonic defect and its correction. (a) The superseded chain: the 60-Hz notch lands where the hardware had already removed the fundamental, while the tall harmonic peaks at 180, 300 and 420~Hz pass the band-pass untouched. (b) The corrected chain: seven constant-width notches land on the peaks. Gray traces are the mean raw EMG spectrum of the five quiet-rest recordings, colored traces the zero-phase response as applied, dotted lines 60~Hz and its harmonics. (c) Share of 20--450-Hz power within $\pm 3$~Hz of a mains multiple, per participant, after each chain; the dashed line marks the 0.098 a white signal would score, since seven $\pm 3$-Hz bands occupy 42~Hz of a 430-Hz pass band, and a notch bank scores below it by deleting those bins.}}{7}{figure.2}\protected@file@percent }
+\newlabel{fig:filter_fix}{{2}{7}{The mains-harmonic defect and its correction. (a) The superseded chain: the 60-Hz notch lands where the hardware had already removed the fundamental, while the tall harmonic peaks at 180, 300 and 420~Hz pass the band-pass untouched. (b) The corrected chain: seven constant-width notches land on the peaks. Gray traces are the mean raw EMG spectrum of the five quiet-rest recordings, colored traces the zero-phase response as applied, dotted lines 60~Hz and its harmonics. (c) Share of 20--450-Hz power within $\pm 3$~Hz of a mains multiple, per participant, after each chain; the dashed line marks the 0.098 a white signal would score, since seven $\pm 3$-Hz bands occupy 42~Hz of a 430-Hz pass band, and a notch bank scores below it by deleting those bins}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Training and evaluation}{7}{subsection.3.5}\protected@file@percent }
+\newlabel{sec:training}{{3.5}{7}{Training and evaluation}{subsection.3.5}{}}
+\citation{lehmann2006testing,demsar2006statistical}
+\citation{guo2017calibration}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Production preprocessing on a real excerpt of an instructed clenching trial (left masseter channel). (a) Time domain and (b) power spectrum after each stage: the notch bank removes the seven mains multiples marked by dotted lines, and the band-pass then removes content outside 20--450~Hz. The chain is applied to the continuous recording; windows are cut afterwards.}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:preprocessing}{{3}{8}{Production preprocessing on a real excerpt of an instructed clenching trial (left masseter channel). (a) Time domain and (b) power spectrum after each stage: the notch bank removes the seven mains multiples marked by dotted lines, and the band-pass then removes content outside 20--450~Hz. The chain is applied to the continuous recording; windows are cut afterwards}{figure.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Single-branch wavelet CNN. The four EMG channels undergo a db4 decomposition; three retained bands pass through parallel per-band CNN sub-branches, are concatenated, and are classified by an MLP with outputs for the five classes. Layer widths, wavelet family, band edges and parameter counts are read from the instantiated model rather than transcribed.}}{8}{figure.4}\protected@file@percent }
+\newlabel{fig:architecture}{{4}{8}{Single-branch wavelet CNN. The four EMG channels undergo a db4 decomposition; three retained bands pass through parallel per-band CNN sub-branches, are concatenated, and are classified by an MLP with outputs for the five classes. Layer widths, wavelet family, band edges and parameter counts are read from the instantiated model rather than transcribed}{figure.4}{}}
+\citation{phinyomark2012feature}
+\citation{pedregosa2011scikit}
+\citation{romano2024wearable}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Feature baselines and the screening harness}{9}{subsection.3.6}\protected@file@percent }
+\newlabel{sec:screening}{{3.6}{9}{Feature baselines and the screening harness}{subsection.3.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7}The channel that is not analysed}{9}{subsection.3.7}\protected@file@percent }
+\newlabel{sec:mic}{{3.7}{9}{The channel that is not analysed}{subsection.3.7}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Training and evaluation configuration. The loss and learning rate were fixed rather than searched, so that the conditions of the same run differ only in what they were asked to do.}}{9}{table.2}\protected@file@percent }
+\newlabel{tab:hyperparameters}{{2}{9}{Training and evaluation configuration. The loss and learning rate were fixed rather than searched, so that the conditions of the same run differ only in what they were asked to do}{table.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{10}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}RQ1: what the measurement chain contributes}{10}{subsection.4.1}\protected@file@percent }
+\newlabel{sec:rq1}{{4.1}{10}{RQ1: what the measurement chain contributes}{subsection.4.1}{}}
+\citation{saito2015precision,davis2006relationship}
+\citation{vandermaaten2008visualizing}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}RQ2: five-class performance on the corrected signal}{11}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Class-level and participant-level behaviour}{11}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:diagnostics}{{4.3}{11}{Class-level and participant-level behaviour}{subsection.4.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces RQ1. The EMG filter chain is the only thing that varies: the same 6,173 windows, the same five outer-fold assignments and the same labels in every arm, verified window by window across the two prediction ledgers. Residual mains power is the share of 20--450-Hz power within $\pm 3$~Hz of a mains multiple, averaged over participant $\times $ class cells; a perfectly white signal would score 0.098. ``Inv.'' counts participant pairs in which one person's resting EMG exceeded another person's active EMG. Differences quoted in the text are computed before rounding.}}{12}{table.3}\protected@file@percent }
+\newlabel{tab:filter}{{3}{12}{RQ1. The EMG filter chain is the only thing that varies: the same 6,173 windows, the same five outer-fold assignments and the same labels in every arm, verified window by window across the two prediction ledgers. Residual mains power is the share of 20--450-Hz power within $\pm 3$~Hz of a mains multiple, averaged over participant $\times $ class cells; a perfectly white signal would score 0.098. ``Inv.'' counts participant pairs in which one person's resting EMG exceeded another person's active EMG. Differences quoted in the text are computed before rounding}{table.3}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces The mains-harmonic defect, in the terms a classification paper is read in. (a) Residual mains power for every candidate chain implemented and measured, against the 0.098 a white signal would score; the chain used is the lowest, and was chosen on this axis rather than on classification score. (b) Screening macro-F1 per held-out participant before and after the correction, on the 28 EMG features and identical folds. (c) The mechanism: each activity's median RMS divided by that participant's own resting RMS, five participants per condition, before (down triangles) and after (up triangles). (d) Between-participant amplitude spread, and the number of pairs in which one person's resting EMG exceeded another's active EMG. No panel reads the microphone.}}{12}{figure.5}\protected@file@percent }
+\newlabel{fig:measurement_chain}{{5}{12}{The mains-harmonic defect, in the terms a classification paper is read in. (a) Residual mains power for every candidate chain implemented and measured, against the 0.098 a white signal would score; the chain used is the lowest, and was chosen on this axis rather than on classification score. (b) Screening macro-F1 per held-out participant before and after the correction, on the 28 EMG features and identical folds. (c) The mechanism: each activity's median RMS divided by that participant's own resting RMS, five participants per condition, before (down triangles) and after (up triangles). (d) Between-participant amplitude spread, and the number of pairs in which one person's resting EMG exceeded another's active EMG. No panel reads the microphone}{figure.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Five-class performance on the corrected signal. The upper block gives participant-level means---computed within each held-out participant, then averaged over the five---so its rows are directly comparable; the lower block gives per-class values on pooled held-out windows, averaged over three seeds, with one-vs-rest AUC computed from held-out probabilities. Values describe this five-participant dataset and are not population-level superiority tests.}}{13}{table.4}\protected@file@percent }
+\newlabel{tab:results}{{4}{13}{Five-class performance on the corrected signal. The upper block gives participant-level means---computed within each held-out participant, then averaged over the five---so its rows are directly comparable; the lower block gives per-class values on pooled held-out windows, averaged over three seeds, with one-vs-rest AUC computed from held-out probabilities. Values describe this five-participant dataset and are not population-level superiority tests}{table.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces One-vs-rest ROC (left) and precision--recall (right) curves for the five classes, pooled over the held-out windows of seed 0 (the lowest seed index, a fixed rule rather than a post-hoc choice). Each curve depicts one trained model per fold, so legend values are that seed's; three-seed means are in Table~\ref {tab:results}. Precision--recall separates the classes far more sharply than ROC, because it is sensitive to the very unequal class sizes.}}{13}{figure.6}\protected@file@percent }
+\newlabel{fig:roc_pr}{{6}{13}{One-vs-rest ROC (left) and precision--recall (right) curves for the five classes, pooled over the held-out windows of seed 0 (the lowest seed index, a fixed rule rather than a post-hoc choice). Each curve depicts one trained model per fold, so legend values are that seed's; three-seed means are in Table~\ref {tab:results}. Precision--recall separates the classes far more sharply than ROC, because it is sensitive to the very unequal class sizes}{figure.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Five-class performance for each held-out participant, averaged over three seeds.}}{13}{table.5}\protected@file@percent }
+\newlabel{tab:persubject}{{5}{13}{Five-class performance for each held-out participant, averaged over three seeds}{table.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Secondary analyses with rest}{13}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:secondary}{{4.4}{13}{Secondary analyses with rest}{subsection.4.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Held-out behaviour of the reported model. (a) Confusion matrix pooled across the five LOSO folds of seed 0 (fixed lowest-seed-index rule, not selected by score), as counts and row-normalised recall. The dominant error patterns are the mutual clenching--grinding confusion and the leakage of chewing windows into the much smaller movement class. (b) Macro-F1 per held-out participant: bars are the mean over three seeds, open markers the individual seeds, and the label inside each bar that participant's held-out window count. Five participants cannot characterise population variability, so no generalisation claim follows from the mean.}}{14}{figure.7}\protected@file@percent }
+\newlabel{fig:diagnostics}{{7}{14}{Held-out behaviour of the reported model. (a) Confusion matrix pooled across the five LOSO folds of seed 0 (fixed lowest-seed-index rule, not selected by score), as counts and row-normalised recall. The dominant error patterns are the mutual clenching--grinding confusion and the leakage of chewing windows into the much smaller movement class. (b) Macro-F1 per held-out participant: bars are the mean over three seeds, open markers the individual seeds, and the label inside each bar that participant's held-out window count. Five participants cannot characterise population variability, so no generalisation claim follows from the mean}{figure.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces t-SNE of the 32-dimensional learned penultimate representation for held-out windows, coloured by experimental class. Embeddings were recomputed from the saved fold checkpoints using only outer-test windows of one seed, so each held-out window appears exactly once.}}{14}{figure.8}\protected@file@percent }
+\newlabel{fig:tsne}{{8}{14}{t-SNE of the 32-dimensional learned penultimate representation for held-out windows, coloured by experimental class. Embeddings were recomputed from the saved fold checkpoints using only outer-test windows of one seed, so each held-out window appears exactly once}{figure.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}RQ3: the learned representation against its alternatives}{14}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:rq3}{{4.5}{14}{RQ3: the learned representation against its alternatives}{subsection.4.5}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Secondary analyses computed post hoc from the held-out five-class predictions, averaged over three seeds. These re-read one trained model; they are not separately trained tasks.}}{15}{table.6}\protected@file@percent }
+\newlabel{tab:sensitivity}{{6}{15}{Secondary analyses computed post hoc from the held-out five-class predictions, averaged over three seeds. These re-read one trained model; they are not separately trained tasks}{table.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Alternative learned architectures}{15}{subsection.4.6}\protected@file@percent }
+\newlabel{sec:deep_baselines}{{4.6}{15}{Alternative learned architectures}{subsection.4.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Three design constraints larger than the architecture}{16}{subsection.4.7}\protected@file@percent }
+\newlabel{sec:constraints}{{4.7}{16}{Three design constraints larger than the architecture}{subsection.4.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Training behaviour and computational cost}{16}{subsection.4.8}\protected@file@percent }
+\newlabel{sec:cost}{{4.8}{16}{Training behaviour and computational cost}{subsection.4.8}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces RQ3. Four architectures on identical inputs: the same 6,173 windows, the same five outer folds and the same three seeds, every model reading the same four EMG channels under one fixed training configuration. Values are participant-level means $\pm $ the standard deviation across the three seeds, computed exactly as elsewhere in this paper. Parameters are trainable parameters read from the instantiated model; ``Forward'' is the median forward pass for one window at batch size 1 on an Intel CPU. Rows are ordered by macro-F1.}}{17}{table.7}\protected@file@percent }
+\newlabel{tab:architectures}{{7}{17}{RQ3. Four architectures on identical inputs: the same 6,173 windows, the same five outer folds and the same three seeds, every model reading the same four EMG channels under one fixed training configuration. Values are participant-level means $\pm $ the standard deviation across the three seeds, computed exactly as elsewhere in this paper. Parameters are trainable parameters read from the instantiated model; ``Forward'' is the median forward pass for one window at batch size 1 on an Intel CPU. Rows are ordered by macro-F1}{table.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Three design constraints, all measured on identical windows and folds with the screening harness and the 28 EMG features. (a) Screening macro-F1 against seconds of temporal context aggregated within a recording; monotone across the range, so the 1.0-s window is a constraint rather than a tuned parameter. TRIAL-LEVEL: each recording holds one condition, so this is a labelled secondary analysis, not stream detection. (b) Every window/guard setting the audit swept: total analysable windows against the smallest participant $\times $ class cell, reported policy circled. The curves separate by window length because trigger granularity differed sharply between participants---67 runs of median 8.7~s for P1, 167 of 1.7~s for P2, 132 of 2.9~s for P3, 141 of 2.9~s for P4, 116 of 3.9~s for P5---so one rule emits very different counts from each. (c) Normalisation scope: the transductive per-participant scope is worth more than the architecture, and is used by no reported number.}}{17}{figure.9}\protected@file@percent }
+\newlabel{fig:design}{{9}{17}{Three design constraints, all measured on identical windows and folds with the screening harness and the 28 EMG features. (a) Screening macro-F1 against seconds of temporal context aggregated within a recording; monotone across the range, so the 1.0-s window is a constraint rather than a tuned parameter. TRIAL-LEVEL: each recording holds one condition, so this is a labelled secondary analysis, not stream detection. (b) Every window/guard setting the audit swept: total analysable windows against the smallest participant $\times $ class cell, reported policy circled. The curves separate by window length because trigger granularity differed sharply between participants---67 runs of median 8.7~s for P1, 167 of 1.7~s for P2, 132 of 2.9~s for P3, 141 of 2.9~s for P4, 116 of 3.9~s for P5---so one rule emits very different counts from each. (c) Normalisation scope: the transductive per-participant scope is worth more than the architecture, and is used by no reported number}{figure.9}{}}
+\citation{chowdhury2013surface,raez2006techniques}
+\citation{deluca2010filtering,besomi2019consensus}
+\citation{wang2022generalizing,kouw2021review}
+\citation{saeb2017need,kapoor2023leakage,varoquaux2022machine}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{18}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}The measurement finding}{18}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}The classification finding, and what bounds it}{18}{subsection.5.2}\protected@file@percent }
+\citation{lan2022comparative}
+\citation{sonmezocak2021detection}
+\citation{saeb2017need,little2017using}
+\citation{besomi2020consensus}
+\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Refit training loss (a) and training-fit macro-F1 (b) for all fifteen fold--seed combinations, coloured by held-out participant; line style encodes seed (solid 0, dashed 1, dotted 2). Each refit runs for the epoch budget chosen inside its own fold, so curves end at different epochs. The held-out participant contributes to no curve and is scored once, after training ends.}}{19}{figure.10}\protected@file@percent }
+\newlabel{fig:loss_curves}{{10}{19}{Refit training loss (a) and training-fit macro-F1 (b) for all fifteen fold--seed combinations, coloured by held-out participant; line style encodes seed (solid 0, dashed 1, dotted 2). Each refit runs for the epoch budget chosen inside its own fold, so curves end at different epochs. The held-out participant contributes to no curve and is scored once, after training ends}{figure.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}What a next study should do}{19}{subsection.5.3}\protected@file@percent }
+\citation{bracci2018frequency}
+\citation{colonna2023electromyographic,lobbezoo2020consensus}
+\citation{lavigne1996sleep,casett2017validity,cidverdejo2024instrumental}
+\citation{romano2024wearable}
+\citation{varoquaux2018cross}
+\citation{besomi2019consensus,hermens2000development}
+\citation{guo2017calibration}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Why the microphone was excluded, and what would make it answerable}{20}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:mic_discussion}{{5.4}{20}{Why the microphone was excluded, and what would make it answerable}{subsection.5.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Validity and limitations}{20}{subsection.5.5}\protected@file@percent }
+\citation{verhoeff2025definitions}
+\citation{manfredini2024standardised}
+\citation{farella2008masticatory}
+\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Six-second excerpts of one participant's quiet rest, instructed grinding and gum chewing after the corrected chain, on a common scale, with the 50~ms RMS envelope beside each. (a) Rest is quiet. (b) Grinding produces sustained activation without a clear burst--relaxation rhythm. (c) Chewing produces rhythmic bursts separated by relaxation intervals at roughly 1.4~Hz. The shaded interval is one 1.0-second analysis window to scale: it holds barely one chewing cycle, the constraint quantified in Fig.~\ref {fig:design}a.}}{21}{figure.11}\protected@file@percent }
+\newlabel{fig:signal_comparison}{{11}{21}{Six-second excerpts of one participant's quiet rest, instructed grinding and gum chewing after the corrected chain, on a common scale, with the 50~ms RMS envelope beside each. (a) Rest is quiet. (b) Grinding produces sustained activation without a clear burst--relaxation rhythm. (c) Chewing produces rhythmic bursts separated by relaxation intervals at roughly 1.4~Hz. The shaded interval is one 1.0-second analysis window to scale: it holds barely one chewing cycle, the constraint quantified in Fig.~\ref {fig:design}a}{figure.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{21}{section.6}\protected@file@percent }
+\bibdata{refs}
+\bibcite{raez2006techniques}{{1}{}{{}}{{}}}
+\bibcite{colonna2023electromyographic}{{2}{}{{}}{{}}}
+\bibcite{thymi2021signal}{{3}{}{{}}{{}}}
+\bibcite{cidverdejo2024instrumental}{{4}{}{{}}{{}}}
+\bibcite{lobbezoo2013bruxism}{{5}{}{{}}{{}}}
+\bibcite{lobbezoo2018international}{{6}{}{{}}{{}}}
+\bibcite{verhoeff2025definitions}{{7}{}{{}}{{}}}
+\bibcite{manfredini2022bruxism}{{8}{}{{}}{{}}}
+\bibcite{manfredini2024standardised}{{9}{}{{}}{{}}}
+\bibcite{farella2008masticatory}{{10}{}{{}}{{}}}
+\bibcite{lavigne2008bruxism}{{11}{}{{}}{{}}}
+\bibcite{manfredini2013epidemiology}{{12}{}{{}}{{}}}
+\bibcite{melo2019bruxism}{{13}{}{{}}{{}}}
+\bibcite{wetselaar2019prevalence}{{14}{}{{}}{{}}}
+\bibcite{lavigne1996sleep}{{15}{}{{}}{{}}}
+\bibcite{stuginski2016detection}{{16}{}{{}}{{}}}
+\bibcite{casett2017validity}{{17}{}{{}}{{}}}
+\bibcite{bracci2018frequency}{{18}{}{{}}{{}}}
+\bibcite{zani2019ecological}{{19}{}{{}}{{}}}
+\bibcite{castroflorio2013use}{{20}{}{{}}{{}}}
+\bibcite{castroflorio2014detection}{{21}{}{{}}{{}}}
+\bibcite{lobbezoo2020consensus}{{22}{}{{}}{{}}}
+\bibcite{sonmezocak2021detection}{{23}{}{{}}{{}}}
+\bibcite{gul2024advanced}{{24}{}{{}}{{}}}
+\bibcite{heyat2020computational}{{25}{}{{}}{{}}}
+\bibcite{lan2022comparative}{{26}{}{{}}{{}}}
+\bibcite{martinot2021artificial}{{27}{}{{}}{{}}}
+\bibcite{patwa2017bruxism}{{28}{}{{}}{{}}}
+\bibcite{haugland2020automatic}{{29}{}{{}}{{}}}
+\bibcite{romano2024wearable}{{30}{}{{}}{{}}}
+\bibcite{mallat1989theory}{{31}{}{{}}{{}}}
+\bibcite{daubechies1992ten}{{32}{}{{}}{{}}}
+\bibcite{englehart2003robust}{{33}{}{{}}{{}}}
+\bibcite{phinyomark2012feature}{{34}{}{{}}{{}}}
+\bibcite{bharathi2025unveiling}{{35}{}{{}}{{}}}
+\bibcite{chowdhury2013surface}{{36}{}{{}}{{}}}
+\bibcite{deluca2010filtering}{{37}{}{{}}{{}}}
+\bibcite{clancy2002sampling}{{38}{}{{}}{{}}}
+\bibcite{merletti2020tutorial}{{39}{}{{}}{{}}}
+\bibcite{boyer2023reducing}{{40}{}{{}}{{}}}
+\bibcite{vanboxtel2001optimal}{{41}{}{{}}{{}}}
+\bibcite{isek1999standards}{{42}{}{{}}{{}}}
+\bibcite{hermens2000development}{{43}{}{{}}{{}}}
+\bibcite{besomi2019consensus}{{44}{}{{}}{{}}}
+\bibcite{besomi2020consensus}{{45}{}{{}}{{}}}
+\bibcite{merletti2019tutorial}{{46}{}{{}}{{}}}
+\bibcite{deluca1997use}{{47}{}{{}}{{}}}
+\bibcite{faust2018deep}{{48}{}{{}}{{}}}
+\bibcite{craik2019deep}{{49}{}{{}}{{}}}
+\bibcite{tsinganos2019improved}{{50}{}{{}}{{}}}
+\bibcite{rim2020deep}{{51}{}{{}}{{}}}
+\bibcite{kiranyaz20211d}{{52}{}{{}}{{}}}
+\bibcite{ismailfawaz2019deep}{{53}{}{{}}{{}}}
+\bibcite{atzori2014electromyography}{{54}{}{{}}{{}}}
+\bibcite{atzori2016deep}{{55}{}{{}}{{}}}
+\bibcite{coteallard2019deep}{{56}{}{{}}{{}}}
+\bibcite{jiang2012myoelectric}{{57}{}{{}}{{}}}
+\bibcite{phinyomark2018emg}{{58}{}{{}}{{}}}
+\bibcite{wei2019multistream}{{59}{}{{}}{{}}}
+\bibcite{lin2017focal}{{60}{}{{}}{{}}}
+\bibcite{johnson2019survey}{{61}{}{{}}{{}}}
+\bibcite{mewett2004reducing}{{62}{}{{}}{{}}}
+\bibcite{levkov2005removal}{{63}{}{{}}{{}}}
+\bibcite{keshtkaran2014fast}{{64}{}{{}}{{}}}
+\bibcite{sornmo2005bioelectrical}{{65}{}{{}}{{}}}
+\bibcite{collins2024tripod}{{66}{}{{}}{{}}}
+\bibcite{kapoor2023leakage}{{67}{}{{}}{{}}}
+\bibcite{varoquaux2022machine}{{68}{}{{}}{{}}}
+\bibcite{pineau2021improving}{{69}{}{{}}{{}}}
+\bibcite{ferrario2000electromyographic}{{70}{}{{}}{{}}}
+\bibcite{castroflorio2005reproducibility}{{71}{}{{}}{{}}}
+\bibcite{saeb2017need}{{72}{}{{}}{{}}}
+\bibcite{little2017using}{{73}{}{{}}{{}}}
+\bibcite{roberts2017cross}{{74}{}{{}}{{}}}
+\bibcite{loshchilov2019decoupled}{{75}{}{{}}{{}}}
+\bibcite{paszke2019pytorch}{{76}{}{{}}{{}}}
+\bibcite{cawley2010overfitting}{{77}{}{{}}{{}}}
+\bibcite{varma2006bias}{{78}{}{{}}{{}}}
+\bibcite{chicco2020advantages}{{79}{}{{}}{{}}}
+\bibcite{lehmann2006testing}{{80}{}{{}}{{}}}
+\bibcite{demsar2006statistical}{{81}{}{{}}{{}}}
+\bibcite{guo2017calibration}{{82}{}{{}}{{}}}
+\bibcite{pedregosa2011scikit}{{83}{}{{}}{{}}}
+\bibcite{saito2015precision}{{84}{}{{}}{{}}}
+\bibcite{davis2006relationship}{{85}{}{{}}{{}}}
+\bibcite{vandermaaten2008visualizing}{{86}{}{{}}{{}}}
+\bibcite{wang2022generalizing}{{87}{}{{}}{{}}}
+\bibcite{kouw2021review}{{88}{}{{}}{{}}}
+\bibcite{varoquaux2018cross}{{89}{}{{}}{{}}}
+\providecommand\NAT@force@numbers{}\NAT@force@numbers
+\gdef \@abspage@last{28}
