@@ -1,0 +1,726 @@
+%%%% Version 7. Reframed revision of main_v6.tex. No new experiments; every number in
+%%%% this file is the number that stood in v6, traced to the same artifacts.
+%%%%
+%%%% What changed relative to v6, and why (Kye's instructions, 2026-08-17):
+%%%%
+%%%%   1. FRAMING. v6 sold the measurement chain as the contribution, which made the
+%%%%      modelling look secondary and left the paper hard to place. v7 sells the whole
+%%%%      pipeline. RQ1 is no longer the thesis; it is the first entry in a measured budget
+%%%%      of what determines performance (new Section "What determines performance" and
+%%%%      Table 8). The design-constraints material, which v6 buried near the end, is now
+%%%%      the spine: it gets its own research question (RQ4) and feeds the synthesis.
+%%%%      Nothing was deleted to achieve this. The 29.3-point filter contrast is reported
+%%%%      in full, in the same place, under a heading that no longer claims it is the point
+%%%%      of the paper.
+%%%%
+%%%%   2. TITLE. "The Measurement Chain Outweighs the Model" contradicted the reframe and
+%%%%      is replaced. NOTE: the new title drops the phrase "Tooth-Contact Bruxism", so
+%%%%      "Bruxism" was added to \keywords to keep the term indexable.
+%%%%
+%%%%   3. ABSTRACT. Rebuilt on motivation / method / finding / broader impact, in that
+%%%%      order, and cut from about 430 words to about 300.
+%%%%
+%%%%   4. NOVELTY. v6 could be read as claiming harmonic notching as a contribution. It is
+%%%%      not novel and v7 says so in as many words (Section "The gap this paper
+%%%%      addresses"): the notch bank is a standard construction, and what was missing was
+%%%%      the check that would have shown it was needed.
+%%%%
+%%%%   5. MICROPHONE. v6 spent about 1.5 columns arguing a negative result about a channel
+%%%%      it did not use, against a literature in which acoustic sensing works. Both mic
+%%%%      sections, the abstract mention and the Table 1 row are deleted; one neutral
+%%%%      sentence remains in the sensors paragraph. The cross-recording fingerprint check
+%%%%      that the mic audit produced is KEPT, promoted to a general pipeline safeguard
+%%%%      (Section "Pipeline safeguards"), which is where it belonged anyway.
+%%%%
+%%%%   6. TEMPORAL CNN. Verified in Code/src/bruxism/models/baselines.py: the run's
+%%%%      dual_branch_temporal_cnn IS dual_branch_wavelet_cnn with the time axis kept -- the
+%%%%      same db4 front end, the same A4/D3/D1 bands, plus stats pooling and a modulation
+%%%%      head. It is therefore not a rival architecture that beat the proposed one; it is
+%%%%      the same family with two capabilities added. Table 7 is regrouped by front end so
+%%%%      that both wavelet models sit above both raw-signal models, and a paragraph answers
+%%%%      the reviewer question directly. The compact model remains the characterised
+%%%%      reference; the extended model is reported as accuracy-optimal. No figures needed
+%%%%      regenerating. Promoting the extended model to headline remains available and would
+%%%%      require re-running Figs 6-8, 10 and 12 from its checkpoints.
+%%%%
+%%%%   7. FIGURE 6b (precision-recall curves) REMOVED at Kye's instruction: the clenching
+%%%%      and grinding curves rise out of near-zero precision at low recall, which reads as
+%%%%      an artifact of uncalibrated scores rather than a result. The substantive point it
+%%%%      carried (AUC flatters the small classes) is kept in prose using Table 3's own
+%%%%      per-class precision, so it now needs no figure and no separate sourcing. Fig. 6 is
+%%%%      the ROC panel alone, moved to a single column.
+%%%%
+%%%%   8. PROSE. v6 ran 127 em-dashes, 20 \emph and 28 \textbf; v7 runs far fewer, with
+%%%%      \textbf reserved for tables and the constraint lead-ins. The "Three design
+%%%%      constraints" section of v6 was the model for the rewrite throughout.
+%%%%
+%%%%   9. NEW CAVEAT, stated for the first time. In outputs/screening/emg_only_design.json
+%%%%      the temporal-context sweep's 1.0-s value (0.7298) is byte-identical to the
+%%%%      per_participant normalisation value (0.7298): the context sweep was run under the
+%%%%      transductive scope, not the strict scope used for reported results. v6 quoted both
+%%%%      numbers without saying they share a baseline. Table 8 and its notes now say so,
+%%%%      and warn that the budget is not additive.
+%%%%
+%%%% Every reported number comes from one of these artifacts:
+%%%%   outputs/runs/modality_and_no_chewing_20260810T020642_cead62e4  (emg_only conditions)
+%%%%   outputs/runs/baselines_emg_only_20260816                      (RQ3 architectures)
+%%%%   outputs/screening/emg_only_filter_contrast.json                (RQ1 filter contrast)
+%%%%   outputs/screening/emg_only_design.json                         (RQ4 design constraints)
+%%%%   outputs/screening/emg_only_contrast.json                       (RQ3 feature baselines)
+%%%%   outputs/data_audit/7ebbcc8d74c0bbe0/                           (guards, sweeps, mains)
+%%%%   outputs/benchmarks/benchmark_emg_only.json                     (parameters, latencies)
+%%%% Run-dependent figures live in Figures/v5/ so that main_4.tex still compiles.
+\documentclass[pdflatex,sn-nature,iicol]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{mathrsfs}
+\usepackage[title]{appendix}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{manyfoot}
+\usepackage{indentfirst}
+
+\graphicspath{{./}{figures/}{Figures/}}
+
+%%%% Float packing. These change typesetting only, and add or remove no content.
+%%%% The default LaTeX fractions reserve so much of each page for text that a document
+%%%% with eleven full-width floats strands roughly two pages in placement dead space.
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.70}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.80}
+\renewcommand{\dbltopfraction}{0.92}
+\renewcommand{\dblfloatpagefraction}{0.80}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\setcounter{dbltopnumber}{3}
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\dblfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\dbltextfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+
+\begin{document}
+
+\title[What Determines Surface-EMG Jaw-Activity Performance]{What Determines Performance in Surface-EMG Jaw-Activity Classification? An Auditable Pipeline from Signal to Decision}
+
+\author[1]{\fnm{Mohammad Hassan} \sur{Farhadi}}
+\author[1]{\fnm{Ali} \sur{Rabiee}}
+\author[1]{\fnm{Rahul} \sur{Singh}}
+\author[2,3]{\fnm{Mariusz P.} \sur{Furmanek}}
+\author*[1]{\fnm{Reza} \sur{Abiri}}\email{reza\_abiri@uri.edu}
+\author*[4]{\fnm{Theodore A.} \sur{Walls}}\email{walls@uri.edu}
+
+\affil[1]{\orgdiv{Department of Electrical, Computer, and Biomedical Engineering}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\affil[2]{\orgdiv{Department of Physical Therapy}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+\affil[3]{\orgdiv{Institute of Sport Sciences, Academy of Physical Education in Katowice}, \orgaddress{\city{Katowice}, \country{Poland}}}
+\affil[4]{\orgdiv{Department of Psychology}, \orgname{University of Rhode Island}, \orgaddress{\city{Kingston}, \state{RI}, \country{United States}}}
+
+\abstract{Bruxism, the habitual clenching or grinding of the teeth, is common and hard to measure outside a clinic. Surface electromyography (EMG) records the jaw muscles directly and is the usual sensor for portable assessment, but systems built on it are reported almost entirely through summary accuracies, which say how well a pipeline scored and almost nothing about which part of it earned the score. We built one such pipeline end to end and priced every stage of it against every other on identical data: signal validation, wavelet decomposition, a compact convolutional network, and leakage-free nested leave-one-subject-out evaluation. The recordings are 100 awake laboratory sessions from five adults with a prior clinical diagnosis of bruxism, covering quiet rest and four instructed jaw activities. On participants it had never seen, the pipeline separated the five conditions at 81.7\% accuracy, 72.0\% macro-F1 and a macro one-vs-rest ROC--AUC of 0.958, with quiet rest the best-recovered class. Pricing its stages gave a consistent ordering. Signal quality set a ceiling: the hardware had already suppressed the 60-Hz mains fundamental and the surviving interference was harmonic, so the conventional single-notch recipe removed the one frequency that was absent, and correcting it gained 29.3 points of macro-F1 on byte-identical windows and folds. Above that ceiling, what a model could represent mattered more than how large it was. The wavelet representation beat the band energies it is built from by 8.1 points and adding an explicit representation of chewing rhythm gained 2.8 more, while 3.2 times the parameters on the raw waveform lost 3.3. Temporal context and normalisation scope, both fixed before any model was trained, were each worth more than the architecture. These results establish technical feasibility for one five-participant dataset. What transfers is the ordering, and a reporting practice costing one pass over the data: publish a measured interference statistic beside every accuracy, and draw filter responses over the measured spectrum of the recordings rather than alone.}
+
+\keywords{Jaw-activity classification, Bruxism, Surface electromyography, Convolutional neural networks, Wavelet decomposition, Signal-quality audit, Measurement validity, Leave-one-subject-out validation}
+
+\maketitle
+
+\section{Introduction}
+
+Bruxism is the habitual clenching or grinding of the teeth. It is common, it wears down teeth and loads the jaw joint over time, and it is difficult to observe directly because it happens while people are asleep or while they are awake and not paying attention to it~\cite{lavigne2008bruxism,manfredini2013epidemiology,melo2019bruxism,wetselaar2019prevalence}. Sleep bruxism has a demanding reference standard, overnight polysomnography with audio and video, which is expensive and cannot be repeated often~\cite{lavigne1996sleep}. Awake bruxism has no instrumental standard at all and is assessed mainly by asking people to report what their jaw is doing when a phone prompts them~\cite{bracci2018frequency,zani2019ecological}. An instrument that could recognise jaw activity automatically, from a sensor a person can wear, would fill a real gap.
+
+Surface electromyography (EMG) is the natural sensor. It places electrodes on the skin over the jaw-closing muscles and records their electrical activity directly, and it is the standard modality for portable recording of masticatory activity~\cite{raez2006techniques,colonna2023electromyographic,thymi2021signal}. What it does not do is tell the activities apart on its own. Clenching, grinding and chewing all contract the same masseter and temporalis muscles, and a one-second slice of one can look much like a one-second slice of another. Separating them is a classification problem, and a hard version of it: a useful system has to work on a person whose muscles, anatomy and electrode placement it has never encountered.
+
+Many groups have built such classifiers and reported good accuracies~\cite{sonmezocak2021detection,gul2024advanced,heyat2020computational,lan2022comparative}. What the literature does not supply is an account of where those accuracies come from. Papers report a final number and a block diagram, and rarely a measured statement about the signal that entered the pipeline, the choices fixed before modelling began, or how much any individual stage contributed~\cite{thymi2021signal,cidverdejo2024instrumental}. This makes results hard to compare and harder to improve on. When one study reports a higher accuracy than another, a reader cannot tell whether the difference lies in the architecture, the window length, the normalisation, or the quality of the recordings themselves, and so cannot tell which part of the better system is worth copying.
+
+This paper takes the opposite approach. We build a single pipeline for classifying jaw activity from surface EMG, and then we price it. Each stage is varied while everything else is held fixed, on the same windows, the same folds and the same labels, and the resulting effects are placed on one scale so they can be compared to each other. The pipeline itself is ordinary in its parts: validate the signal, decompose it into frequency bands with a wavelet transform, classify each window with a small convolutional network, and evaluate under a nested leave-one-subject-out protocol in which nothing fitted during training has seen the participant being scored. What is unusual is that every part of it reports what it was worth.
+
+The answer has a shape worth stating up front. Signal quality sets a ceiling, and no modelling choice reaches above it. Below that ceiling, what a model is able to represent matters considerably more than how many parameters it has: the largest model we evaluated placed third of four, and the smallest placed second. Choices made before any model was trained, such as how long an analysis window is allowed to be, were worth as much as the architecture or more.
+
+\paragraph{Scope.} Two statements follow from current terminology and are made here once. International consensus defines bruxism as masticatory-muscle activity that may involve clenching or grinding with tooth contact, or bracing and thrusting without it, and distinguishes sleep from awake manifestations~\cite{lobbezoo2013bruxism,lobbezoo2018international,verhoeff2025definitions,manfredini2022bruxism}. Tooth contact is therefore neither necessary for all bruxism activities nor sufficient to establish that an observed activity is bruxism. Second, every activity analysed here was performed on instruction in a laboratory. The class names used below, rest, movement, clenching, grinding and chewing, denote experimental conditions, and a classifier that separates them is not a diagnostic device~\cite{manfredini2024standardised}. The study does not evaluate spontaneous awake bruxism, sleep bruxism, severity or treatment response, and neither point is revisited later.
+
+\paragraph{A word on interference.} One term recurs throughout and is worth defining before it is used. Mains interference is electrical noise picked up from the building's power wiring. In the United States that wiring alternates at 60~Hz, but it does not radiate a clean 60-Hz tone: lighting, displays and switched-mode power supplies distort the waveform, so energy also appears at multiples of 60~Hz, at 120, 180, 240~Hz and upwards. These multiples are called harmonics. Electrodes and their lead wires act as small antennas for all of it, and because muscle activity occupies roughly 20 to 450~Hz, the interference lands squarely inside the band the measurement cares about. Removing it is a routine preprocessing step. Confirming that it was actually removed, on the recordings in hand rather than in principle, is not routine, and that turns out to matter.
+
+\paragraph{Research questions.}
+
+\textbf{RQ1.} How much of what a classifier learns from these recordings comes from the participants' physiology, and how much from mains interference? We answer this by running two filter chains over identical windows, folds and labels, so the filter is the only thing that differs.
+
+\textbf{RQ2.} Can four channels of surface EMG separate quiet rest from four instructed jaw activities on a participant the system has never seen, under a protocol in which nothing fitted during training has touched that participant's data?
+
+\textbf{RQ3.} Which part of the model does the work: the wavelet representation, the architecture built on top of it, or simply the number of parameters? We compare the learned representation against hand-engineered band-energy features, and against three alternative architectures given identical inputs.
+
+\textbf{RQ4.} How do those modelling choices compare against choices fixed before any model was trained, namely the analysis window length, the amount of temporal context available to a decision, and the scope over which the signal is normalised?
+
+Results obtained before the filter correction are superseded and are not restated for comparison, because the two sets of numbers were measured through different measurement chains on the same recordings.
+
+\paragraph{Contributions.} This paper contributes an end-to-end jaw-activity classification pipeline in which every reported number is regenerated from a saved prediction ledger rather than transcribed from a log; a five-class result on unseen participants that includes a quiet-rest class, which activity-only designs usually omit and which is what makes a false-alarm estimate possible at all; a measured budget placing signal quality, learned representation, architecture, temporal context and normalisation scope on one comparable scale; and two inexpensive checks that other groups can adopt directly, namely drawing the filter response over the measured spectrum of the recordings, and fingerprinting every channel of every recording before fitting anything to it.
+
+\section{Background}
+
+\subsection{EMG-based assessment of masticatory activity}
+
+Surface EMG is widely used for ambulatory assessment because it measures masticatory activation directly~\cite{raez2006techniques,farella2008masticatory}. The reference standards it is compared against are demanding: polysomnography with audio and video recording remains the standard for sleep bruxism~\cite{lavigne1996sleep,stuginski2016detection}, while portable instruments show variable agreement with it~\cite{casett2017validity,cidverdejo2024instrumental}. Early portable EMG systems established the feasibility of home recording but had limited specificity for distinguishing target activity from other orofacial activity~\cite{stuginski2016detection}. Castroflorio et al.~\cite{castroflorio2013use,castroflorio2014detection} combined EMG and electrocardiographic information to identify sleep-bruxism episodes in a natural environment; multi-day home recording has since been shown to be feasible~\cite{colonna2023electromyographic}, and consensus guidance now exists for ambulatory EMG in this setting~\cite{lobbezoo2020consensus}.
+
+Machine-learning studies report high performance on controlled tasks, although direct comparison is difficult when labels, participants and validation protocols differ. Sonmezocak and Kurt~\cite{sonmezocak2021detection} reported greater than 90\% accuracy from EMG features across jaw opening, clenching, rhythmic grinding and fatigue or pain classes; Gul et al.~\cite{gul2024advanced} evaluated sleep-related recordings across postures; Heyat et al.~\cite{heyat2020computational} combined several physiological modalities; and Lan et al.~\cite{lan2022comparative} described different surface-EMG patterns during centric and eccentric instructed activities. Alternative sensing routes include mandibular-movement analysis for phasic sleep bruxism~\cite{martinot2021artificial}, chin-mounted accelerometry~\cite{patwa2017bruxism}, contingent-stimulation devices~\cite{haugland2020automatic} and head-mounted acoustic transducers, whose output depends strongly on placement~\cite{romano2024wearable}. These studies support technical feasibility but do not make their accuracies interchangeable: some classify pre-segmented tasks whereas others identify events within continuous recordings, and portable devices intended for sleep require comparison with an appropriate reference method~\cite{cidverdejo2024instrumental}.
+
+\subsection{Signal processing and learned representations}
+
+Wavelet decomposition suits EMG because muscle activity is non-stationary, meaning its frequency content changes from moment to moment, and a wavelet transform preserves when something happened as well as at what frequency~\cite{mallat1989theory,daubechies1992ten,englehart2003robust}. Wavelet features perform well in EMG classification~\cite{phinyomark2012feature,bharathi2025unveiling}. Filter design remains important for preserving physiological content while suppressing noise~\cite{chowdhury2013surface,deluca2010filtering,clancy2002sampling,merletti2020tutorial,boyer2023reducing}, and the useful band for facial, jaw and neck muscles has been measured directly~\cite{vanboxtel2001optimal}. Recording standards and consensus matrices exist for electrode selection and amplitude normalisation~\cite{isek1999standards,hermens2000development,besomi2019consensus,besomi2020consensus,merletti2019tutorial,deluca1997use}. Convolutional networks learn local patterns in physiological signals~\cite{faust2018deep,craik2019deep,tsinganos2019improved,rim2020deep,kiranyaz20211d,ismailfawaz2019deep}, an approach mature enough in myoelectric control to have public benchmarks~\cite{atzori2014electromyography,atzori2016deep,coteallard2019deep,jiang2012myoelectric,phinyomark2018emg,wei2019multistream}, and focal loss and class weighting reduce the influence of class imbalance~\cite{lin2017focal,johnson2019survey}.
+
+\subsection{The gap this paper addresses}
+\label{sec:gap}
+
+Surface-EMG reviews consistently identify powerline interference as the dominant environmental artifact and recommend notch filtering combined with a band-pass stage~\cite{chowdhury2013surface,raez2006techniques}. That recommendation is usually implemented as a single notch at the supply frequency, which is valid only when the supply fundamental is in fact the dominant interference. Head-mounted electrodes with long leads, in a laboratory containing displays, lighting and switched-mode supplies, can instead pick up a harmonic-rich waveform, and some acquisition systems apply their own fixed notch before the data reach the analysis software. In that combination the textbook chain removes nothing and still looks correct on a filter-response plot.
+
+We claim no novelty for the remedy. Notching every harmonic rather than the fundamental alone is a standard construction, and harmonic-aware and subtraction-based methods have been available in the biosignal-processing literature for two decades~\cite{mewett2004reducing,levkov2005removal,keshtkaran2014fast,sornmo2005bioelectrical}. They are simply not routine in this application area, and, more to the point, nothing in a conventional analysis would tell a practitioner that they were needed here.
+
+That is the actual gap. Published accuracies in this literature are almost never accompanied by a measured statement about the signal they were computed from, and a scoping review of ambulatory EMG for bruxism found acquisition and analysis parameters reported inconsistently or not at all~\cite{thymi2021signal}. Nor are the choices that surround the model, such as window length and normalisation scope, usually priced against it. A reader is therefore left unable to attribute a reported result to any part of the system that produced it. The same concern drives reporting standards and leakage audits elsewhere in clinical machine learning~\cite{collins2024tripod,kapoor2023leakage,varoquaux2022machine,pineau2021improving}. What this paper adds is not a filter. It is a pipeline that measures its own stages and reports what each was worth.
+
+\section{Methods}
+
+This proof-of-concept study was approved by the Institutional Review Board of the University of Rhode Island (Protocol \#IRB22275690-2) and performed in accordance with relevant institutional guidelines and regulations. Written informed consent was obtained from every participant, including consent to publish the identifying image in Fig.~\ref{fig:setup}a.
+
+\subsection{Participants, procedure and sensors}
+
+Five adults (2 women and 3 men; age $38.0 \pm 10.4$ years) were recruited through flyers, messages to local oral-care and physical-therapy providers, and word of mouth; eligibility required a prior clinical diagnosis of bruxism. The study did not independently re-diagnose or phenotype that history, and the available records did not stratify participants by sleep bruxism, awake bruxism, grinding, bracing or thrusting predominance. The prior diagnosis therefore describes the sample and is not a reference standard for the activity labels used here. All analysed tasks were performed intentionally while participants were awake in the laboratory; no spontaneous episodes and no sleep were recorded.
+
+Each session began with written consent and a pre-screening survey, after which the sensors were positioned and secured. Participants completed 1 minute of quiet rest, then five repetitions each of jaw opening and closing, left and right deviation, protrusion and retrusion, and left and right biting, then 1-minute trials of isometric molar and incisor clenching alternating 3 seconds of activity with 3 seconds of relaxation. After a break they completed 3-minute trials of instructed grinding, chewing cheese, chewing baby carrots or popcorn, and chewing gum. Each task was repeated three times with a 1-minute rest between repetitions. A handheld button transmitted event markers synchronised with the physiological recordings: participants pressed it at task initiation and the experimenter visually confirmed onset. These button-marked intervals are the sole source of the class labels used in this paper.
+
+Four differential surface-EMG channels were recorded from two bilateral bipolar electrode pairs, one per side of the head (Fig.~\ref{fig:setup}a); the tentative electrode map records them as left masseter, left temporalis, right masseter and right temporalis, the sites for which bilateral surface recording and its reproducibility are best characterised~\cite{ferrario2000electromyographic,castroflorio2005reproducibility}. A camera and an omnidirectional microphone were also recorded to assist offline review of the trials. Neither is part of the analysis and no result in this paper reads them. All signals were sampled at 1200~Hz. The acquisition chain documented no physical calibration, so all amplitudes are reported in arbitrary analog-to-digital converter units and are deliberately not labeled \textmu V, and electrode type, amplifier, preamplifier gain and converter resolution are not documented. This falls short of current reporting recommendations~\cite{isek1999standards,besomi2019consensus} and is stated so that the omission is visible rather than inferred.
+
+\begin{figure}[t]
+  \centering
+  \raisebox{0.03\height}{\includegraphics[width=0.895\linewidth]{Figures/patient_new.png}}\hfill
+  \caption{Sensor placement: bipolar surface-EMG pairs over the temporalis (EMG-T) and masseter (EMG-M), with a microphone (MIC) near the temporomandibular joint used only to assist offline review of the trials.}
+  \label{fig:setup}
+\end{figure}
+
+\subsection{Window labelling and the analysable sample}
+\label{sec:windows}
+
+Every analysed window lies wholly inside one interval during which the trigger marks the participant as actively performing the named task, so no window can span two conditions or a trigger transition. Windows are cut from the continuously filtered recording and never filtered individually, because filtering each window separately injects an edge transient exceeding one signal standard deviation into its first 50 samples.
+
+Three exclusions are applied before windowing, and each guard was measured rather than assumed (Table~\ref{tab:dataset}). A transition guard of 0.25~s is removed on each side of every trigger edge. Over 432 task onsets, 358 of them with a detectable envelope transition, the median lag between button press and electromyographic onset was $-0.075$~s and muscle activity preceded the marker at 79.9\% of onsets, while among the 20\% of onsets in the harmful direction the median lag was 0.054~s and the largest measured was 0.352~s. A startup guard of 0.5~s is removed at the beginning of every recording, replacing an earlier unexplained 3-s skip; amplifier settling transients appeared in 66 of 100 recordings, all settled within 0.40~s, with peak excursions up to $12{,}580\times$ the recording's robust scale. Finally, quiet-rest windows are drawn only from the five dedicated rest recordings, because trigger-off intervals inside active recordings are unlabelled rather than verified as quiet. The rest class therefore represents quiet laboratory rest, not the full range of everyday non-event behaviour.
+
+The recordings were consolidated into five experimental classes. Rest comprised windows from the five dedicated quiet-baseline recordings only; movement included opening and closing, lateral deviation and protrusion and retrusion; clenching included molar clench, incisor clench and unilateral left or right bite; grinding included the instructed grinding trials; and chewing included cheese, carrots or popcorn, and gum. These categories contrast quiet non-event periods, non-chewing jaw movement, static loading, lateral tooth-contact activity and functional mastication; bracing and thrusting without tooth contact were not elicited and are not represented. Chewing was included because it is a common functional activity and a plausible confound for an ambulatory jaw-activity classifier. Because it may also be comparatively easy to recognise, the primary five-class results are accompanied by a sensitivity analysis that excludes it and by a second that collapses the five labels into instructed clenching or grinding versus rest, movement and chewing.
+
+Under these rules, 100 recordings yielded 6,173 analysable 1.0-second windows from 99 recordings (Table~\ref{tab:dataset}, Fig.~\ref{fig:setup}b). These counts supersede the 11,845 windows reported previously, which a legacy policy produced by labelling whole recordings rather than trigger-verified intervals and which therefore included inter-trial and transition material inside activity classes; the two sets are not comparable. The windows are not independent observations, because adjacent windows overlap by 50\%, many come from the same recording, and all come from five people. The participant, not the window, is therefore the effective unit for generalisation, and all primary metrics are computed within a participant before being summarised~\cite{saeb2017need,little2017using,roberts2017cross}.
+
+\begin{table}[t]
+  \caption{Dataset, guards and preprocessing under the trigger-constrained labelling policy.}
+  \label{tab:dataset}
+  \centering
+  \footnotesize
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}ll@{}}
+    \toprule
+    Property & Value \\
+    \midrule
+    Participants / recordings & 5 / 100 (99) \\
+    EMG channels analysed & 4 (2 bilateral pairs) \\
+    Sampling rate / units & 1200 Hz / arbitrary ADC \\
+    Window / stride & 1200 (1.0 s) / 600 (0.5 s) \\
+    Transition guard, per edge & 0.25 s \\
+    Startup guard, per recording & 0.5 s \\
+    \midrule
+    Rest windows (5 dedicated recs.) & 590 \\
+    Movement windows & 333 \\
+    Clenching windows & 799 \\
+    Grinding windows & 816 \\
+    Chewing windows & 3,635 \\
+    \textbf{Total analysed windows} & \textbf{6{,}173} \\
+    \midrule
+    Mains notches (8 Hz wide) & 60--420 Hz, 7 harm. \\
+    Band-pass (Butterworth, order 4) & 20--450 Hz \\
+    Filtering mode & Zero-phase, whole rec. \\
+    Wavelet / bands & db4, 4 lev.\ / $A_4$, $D_3$, $D_1$ \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\subsection{Signal validation and the filter chain}
+\label{sec:filter}
+
+The first stage of the pipeline checks that the recordings contain what the analysis assumes they contain. Because that check is also the subject of RQ1, its measurements are given here and its effect on classification in Section~\ref{sec:rq1}.
+
+The acquisition software applied its own fixed notch, recorded in every metadata sidecar, and that notch removed the 60-Hz fundamental before the data reached disk. Interference survived at the harmonics instead. Measured against the local noise floor of the raw signals, the peaks at 180, 300 and 420~Hz ranged from tens of times that floor in the least affected participant to more than a million times it in the most affected. Across all 100 recordings, 62 had more than 30\% of their raw in-band EMG power within $\pm 3$~Hz of a mains multiple, and in the five dedicated quiet-rest recordings that share was 91.3--99.8\%.
+
+The chain used in earlier analyses of this dataset was a single 60-Hz notch ($Q=30$) followed by a 20--450-Hz band-pass. On these recordings it removed the only mains frequency that was already absent and passed every frequency that was present: the mains share of in-band power after filtering was 91.4--99.8\%, essentially unchanged from the raw signal (Fig.~\ref{fig:filter_fix}a, c). A filter-response plot of that chain looks entirely conventional, which is why the problem stayed invisible until the response was drawn over the measured spectrum of the data.
+
+The corrected chain notches every mains multiple inside the pass band, at 60, 120, 180, 240, 300, 360 and 420~Hz, before the same fourth-order Butterworth band-pass from 20 to 450~Hz, a band consistent with direct measurements of the useful bandwidth of jaw and facial EMG~\cite{vanboxtel2001optimal,deluca2010filtering}. Each notch is constant-width, at 8~Hz measured at $-3$~dB, so $Q = f_0/8$, rather than constant-$Q$, which would give a 2-Hz notch at 60~Hz and a 14-Hz notch at 420~Hz: the narrowest response exactly where the hardware notch left a residue, the widest where nothing survives. Both variants remove 56~Hz of the 430-Hz pass band, an identical 13\% cost, but at that cost the constant-width bank left the worst-contaminated cell at $3.2\times$ its local noise floor against $25.6\times$ for constant $Q$, an eight-fold reduction in residual interference. After correction the mains share in the quiet-rest recordings fell to 0.46--0.66\% (Fig.~\ref{fig:filter_fix}b, c). A comb filter and spectrum interpolation~\cite{mewett2004reducing} were also implemented and measured on the same windows; both left more residual interference, and spectrum interpolation is additionally acausal by construction.
+
+The chain was selected on this interference criterion, which can be specified in advance, and not on held-out classification score. The distinction is not decorative. The constant-$Q$ bank scored marginally higher in screening classification, at 0.689 against 0.679 macro-F1 on the same windows, while leaving eight times the residual interference, so a score criterion would have selected the worse signal.
+
+All filtering is zero-phase, using forward and backward second-order sections, and is applied to the whole continuous recording before any window is cut. Zero-phase filtering reads samples from the future of each output sample. It is appropriate for the offline analysis reported here and cannot support a streaming, wearable or real-time claim. A causal mode exists in the implementation, and the mode used is recorded in every run bundle.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.86\linewidth]{Figures/filter_defect_and_correction.png}
+  \caption{The mains-harmonic defect and its correction. (a) The superseded chain: the 60-Hz notch lands where the hardware had already removed the fundamental, while the tall harmonic peaks at 180, 300 and 420~Hz pass the band-pass untouched. (b) The corrected chain: seven constant-width notches land on the peaks. Gray traces are the mean raw EMG spectrum of the five quiet-rest recordings, colored traces the zero-phase response as applied, dotted lines 60~Hz and its harmonics. (c) Share of 20--450-Hz power within $\pm3$~Hz of a mains multiple, per participant, after each chain. The dashed line marks the 0.098 a white signal would score, since seven $\pm3$-Hz bands occupy 42~Hz of a 430-Hz pass band, and a notch bank scores below it by deleting those bins.}
+  \label{fig:filter_fix}
+\end{figure*}
+
+\subsection{Normalisation, wavelet decomposition and model}
+
+EMG signals were z-scored per channel using means and standard deviations computed only from the training participants of the fold in question. The list of participants that produced each fold's statistics is stored with the fold and asserted not to contain the held-out participant before that participant is evaluated. A per-participant, or transductive, scope is implemented and prespecified as a separate configuration, and Section~\ref{sec:constraints} prices it, but no confirmatory number here uses it: the strict scope is the one that would support a deployment claim without a fitting session~\cite{besomi2020consensus}.
+
+Figure~\ref{fig:preprocessing} shows the chain on a real excerpt. Signals were then decomposed with the Daubechies-4 wavelet at four levels, and the sub-branches used $A_4$ (below 38~Hz), $D_3$ (75--150~Hz) and $D_1$ (300--600~Hz, of which only the 300--450-Hz portion survives the band-pass). Daubechies wavelets were selected for their compact support and prior use in transient EMG analysis~\cite{daubechies1992ten,englehart2003robust}. The pipeline rejects any band its own filter chain has removed, unless the configuration declares the exception explicitly.
+
+The reference model is a single-branch wavelet convolutional network (Fig.~\ref{fig:architecture}) with three CNN sub-branches, one per retained band. Each applies a 3-tap convolution to 8 channels, batch normalisation, a rectified linear unit, max pooling by 2, a second 3-tap convolution to 16 channels, batch normalisation, a rectified linear unit and adaptive average pooling to one value per channel, contributing 16 features per band and 48 in total. Those 48 features pass to a multilayer perceptron (MLP) of dimensions $48\rightarrow48\rightarrow32$, with batch normalisation, a rectified linear unit and dropout at probability 0.5 in each hidden layer, and a final linear layer produces logits for the five classes. The complete model has 5,901 trainable parameters, of which 1,656 are in the wavelet branch, 4,080 in the MLP and 165 in the classification head, or 23.1~KiB at 32-bit precision. Section~\ref{sec:deep_baselines} evaluates an extended member of the same family alongside it.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.76\linewidth]{Figures/preprocessing_stages_5class.png}
+  \caption{Production preprocessing on a real excerpt of an instructed clenching trial (left masseter channel). (a) Time domain and (b) power spectrum after each stage: the notch bank removes the seven mains multiples marked by dotted lines, and the band-pass then removes content outside 20--450~Hz. The chain is applied to the continuous recording; windows are cut afterwards.}
+  \label{fig:preprocessing}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{Figures/Pipeline_V2.png}
+  \caption{Single-branch wavelet CNN, the reference model. The four EMG channels undergo a db4 decomposition; three retained bands pass through parallel per-band CNN sub-branches, are concatenated, and are classified by an MLP with outputs for the five classes. Layer widths, wavelet family, band edges and parameter counts are read from the instantiated model rather than transcribed.}
+  \label{fig:architecture}
+\end{figure*}
+
+\subsection{Training and evaluation}
+\label{sec:training}
+
+Class imbalance was addressed with inverse-frequency class weights recomputed within each outer training fold, and with augmentation of minority-class training windows by amplitude scaling in $[0.9, 1.1]$ (probability 0.5), additive Gaussian noise at 2\% of the window standard deviation (probability 0.3) and circular shifts of up to $\pm50$ samples (probability 0.3). A window was eligible with probability 0.4 and only if its class fell below 70\% of the largest class in that fold, so chewing windows were never augmented and rest windows were. Augmentation is confined to the training partition structurally: the augmenter raises an error for any other stage, and each transformation is seeded by the triple of run seed, epoch and sample identifier so it does not depend on worker count or batch order. Optimisation used AdamW~\cite{loshchilov2019decoupled} and focal loss~\cite{lin2017focal} in PyTorch~\cite{paszke2019pytorch}, with the settings in Table~\ref{tab:hyperparameters}. The loss and learning rate were fixed rather than searched, so that no condition could win by drawing a better hyperparameter.
+
+Evaluation used nested LOSO, because selecting a model and reporting its score on the same held-out data biases the estimate upward~\cite{cawley2010overfitting,varma2006bias}. In each of the five outer folds one participant was sealed as the test set and the remaining four entered a participant-grouped inner LOSO loop of four folds; every normalisation statistic, class weight and augmentation minority set was fitted on inner-training participants only. The best epoch was recorded per inner fold by validation macro-F1, and the model was refit on all four outer-training participants for the median of those best epochs, with no early stopping and no validation set, before the held-out participant was evaluated exactly once. That participant's sample identifiers are stored privately and released only by an explicit single-use call, so selection code cannot reach them even accidentally. Macro-F1 was the selection objective rather than accuracy, because accuracy is dominated by chewing~\cite{chicco2020advantages}. Three seeds all completed all five outer folds; metrics are computed independently per seed and then summarised, probabilities are never averaged across seeds and no seed is selected as best. Across the fifteen fold and seed combinations the epoch budget ranged from 15 to 43 (median 19), and the five-class conditions took 1.1~h of the 4.8~h the complete matched run required.
+
+\textbf{Participant-level metrics are primary.} Accuracy, balanced accuracy, macro precision, recall, F1 and one-vs-rest ROC--AUC are computed within each held-out participant and then summarised across the five, with all five individual values reported. Pooled-window metrics are descriptive only, because windows within a participant and recording are correlated. AUC was computed from saved held-out probabilities, never from hard labels or a confusion matrix, and a class absent from a fold receives no AUC rather than an imputed value. No window-level bootstrap intervals or $p$-values are reported: the windows are clustered and overlapping, and with five participants such tests would overstate precision without supporting a population-level claim~\cite{lehmann2006testing,demsar2006statistical}. Held-out probabilities are uncalibrated, with an expected calibration error of 0.063, and must not be read as probabilities~\cite{guo2017calibration}, though every AUC remains valid because AUC is rank-based and unaffected by monotone rescaling.
+
+Two secondary analyses were computed post hoc from the same held-out five-class predictions and are labelled as such: chewing windows removed and the remaining four probabilities renormalised, with a separately trained four-class model run on the same windows and folds as a check that renormalisation is not doing the work; and predictions collapsed into instructed clenching or grinding versus rest, movement and chewing. Both re-read one model rather than training a new one, and the second is task discrimination, not bruxism detection, because the positive tasks were elicited and the background class excludes unrestricted free-living behaviour.
+
+\subsection{Feature baselines and the screening harness}
+\label{sec:screening}
+
+Two families of measurement come from a deliberately cheap screening harness rather than the confirmatory protocol, and every value it produces is labelled as such. The harness extracts 28 hand-written features per window: for each EMG channel, the log RMS of each of five db4 bands, the log waveform length and the zero-crossing rate~\cite{phinyomark2012feature}. It fits one model per outer fold with no nested hyperparameter selection, using multinomial logistic regression and histogram gradient boosting~\cite{pedregosa2011scikit}. Because the feature set was chosen after looking at these five participants and no nested selection is performed, screening numbers are directionally reliable and optimistic in level. They decide which change is worth a confirmatory run and are never reported as a result on their own.
+
+The harness supplies the matched before-and-after comparison for RQ1 (Section~\ref{sec:rq1}), the hand-engineered baseline for RQ3 (Section~\ref{sec:rq3}), and all three measurements for RQ4 (Section~\ref{sec:constraints}). The band-energy baseline is the relevant comparison for a network whose per-band sub-branches reduce each band to a pooled amplitude, since a learned representation that cannot beat the band energies it is built from is not earning its place. Everything runs on the identical 6,173 windows and five outer folds as the confirmatory model.
+
+\begin{table}[t]
+  \caption{Training and evaluation configuration. The loss and learning rate were fixed rather than searched, so that the conditions of the same run differ only in what they were asked to do.}
+  \label{tab:hyperparameters}
+  \centering
+  \footnotesize
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}ll@{}}
+    \toprule
+    Hyperparameter & Value \\
+    \midrule
+    Optimiser & AdamW \\
+    Learn.\ rate / weight decay & $10^{-3}$ / $10^{-4}$ \\
+    Loss & Focal, $\gamma = 1.5$ \\
+    Class weights & Inverse freq., per fold \\
+    Dropout / batch size & 0.5 / 64 \\
+    Gradient clipping & Norm 1.0 \\
+    Epoch budget & Median inner best (15--43) \\
+    Seeds & 0, 1, 2 \\
+    Outer / inner folds & 5 / 4, ppt-grouped \\
+    Normalisation scope & Strict (outer-train ppts) \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\subsection{Pipeline safeguards}
+\label{sec:safeguards}
+
+Three guards run inside the pipeline rather than beside it, and each refuses to proceed rather than warning.
+
+The first is the leakage assertion already described: the participant list behind every fitted quantity is stored with its fold and checked against the held-out participant before that participant is scored. The second is the band check of Section~\ref{sec:filter}, which refuses any wavelet band the filter chain has already removed unless the configuration declares the exception. The third is a channel-integrity check that compares recordings against each other rather than examining them one at a time. The pipeline computes a rotation-invariant fingerprint of every channel of every recording, groups identical fingerprints, and refuses any run in which a held-out participant's signal also appears in its own training set.
+
+The third check is worth describing because the class of defect it catches is invisible to the usual ones. A duplicated channel produces files that are individually well-formed, correctly sized and full of plausible values; the duplication appears only when two files are compared, so an audit that examines recordings one at a time cannot find it. The check costs one pass over the data, is modality-agnostic, and is the reason the analysed EMG channels can be stated to be 100 distinct waveforms rather than assumed to be.
+
+\section{Results}
+
+The confirmatory results come from the EMG conditions of one nested-LOSO run on the corrected signal: five outer folds and three seeds, 6,173 held-out window predictions per seed, 18,519 in total for the five-class task and a further 7,614 for the separately trained four-class task. Every value was recomputed from the saved prediction ledgers, in which each held-out window appears exactly once per task, model and seed. Screening values are marked wherever they appear.
+
+\subsection{RQ1: how much of the signal is physiology}
+\label{sec:rq1}
+
+The filter chain was changed while the windows, folds and labels were held identical, so the comparison isolates the chain (Table~\ref{tab:filter}, Fig.~\ref{fig:measurement_chain}). Identical is meant literally: the 6,173 windows, their five outer-fold assignments and their class labels are the same objects in both arms, verified by comparing the two prediction ledgers window by window.
+
+The confirmatory network answers the question directly. Through the superseded chain it reached 55.0\% accuracy, 43.5\% participant-level macro-F1 and a macro one-vs-rest AUC of 0.785. Through the corrected chain the matched condition reached 80.9\%, 72.8\% and 0.963, a gain of 29.3 points of macro-F1, 25.9 of accuracy and 0.178 of AUC, and the share of quiet-rest windows misread as clenching or grinding fell from 30.2\% to 6.1\%. The contrast is conservative twice over: the superseded run also searched the loss and learning rate inside each fold, which the corrected run fixed, and both arms are the fused condition, so the superseded arm carried an input channel it could exploit. The corrected EMG-only condition reported throughout the rest of this paper scores 72.0\% macro-F1, within a point of its fused counterpart.
+
+The screening harness reproduces the effect with two much simpler estimators, which rules out an idiosyncrasy of the network. Logistic regression on the 28 EMG band-energy features moved from 53.1\% accuracy and 37.3\% macro-F1 to 78.3\% and 63.9\%, and gradient boosting from 38.8\% to 61.3\% macro-F1. Three estimators of very different capacity move by 22 to 29 points, and none saw a new window, a new label or a new fold.
+
+The per-participant view shows how severe the earlier state was. Through the superseded chain two of the five held-out participants were essentially unclassifiable, with P1 at 18.1\% macro-F1 and 26.9\% accuracy and P2 at 5.4\% and 6.9\%, both at or below what a constant prediction would achieve, while P3 to P5 scored 57.6--75.4\%. After the correction the same five span 61.4--82.4\%. What had looked like severe between-participant heterogeneity, the standard reading of such a spread and the one that motivates transfer learning and per-user calibration, was substantially an artifact of interference differing between recording sessions.
+
+Three further measurements establish that the superseded chain was not merely suboptimal but inert, and explain the mechanism. First, the 60-Hz notch was doing nothing. A control chain with no mains removal at all, band-pass only, scored 38.5\% macro-F1, within 1.2 points of the superseded chain's 37.3\% and comfortably inside the range of the two. Filtering the fundamental the hardware had already removed was, to the precision this comparison can resolve, equivalent to not filtering.
+
+Second, the interference was large enough to be the dominant signal. Expressed as each activity's median RMS divided by that participant's own resting RMS, which is the contrast a classifier must exploit, the superseded chain left chewing at 1.6--7.2$\times$ rest and clenching at 1.6--5.2$\times$. After correction the same quantities are 8.5--35.7$\times$ and 8.1--27.0$\times$ (Fig.~\ref{fig:measurement_chain}c). The physiological contrast was present the whole time, buried under interference that varied more between people than the physiology varied between conditions.
+
+Third, that is exactly what the between-participant statistics show. The superseded chain left a $5.07\times$ spread between the largest and smallest participant median RMS and 20 pairs in which one person's resting EMG exceeded another's active EMG, against $2.97\times$ and no such pairs after correction (Fig.~\ref{fig:measurement_chain}d). A model trained on the earlier signal could reduce its loss by learning which participant a window came from rather than what that participant was doing, and LOSO is the protocol that then reports the consequence as poor generalisation. The screening arm shows the same per-participant pattern (Fig.~\ref{fig:measurement_chain}b): P2, who gained most, moved from 0.135, below the 0.165 a uniform guess would score, to 0.645.
+
+\begin{table*}[t]
+  \centering
+  \caption{RQ1. The EMG filter chain is the only thing that varies: the same 6,173 windows, the same five outer-fold assignments and the same labels in every arm, verified window by window across the two prediction ledgers. Residual mains power is the share of 20--450-Hz power within $\pm3$~Hz of a mains multiple, averaged over participant and class cells; a perfectly white signal would score 0.098. ``Inv.'' counts participant pairs in which one person's resting EMG exceeded another person's active EMG. Differences quoted in the text are computed before rounding.}
+  \label{tab:filter}
+  \footnotesize
+  \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc@{}}
+    \toprule
+    & \multicolumn{3}{c}{Measured signal properties} & \multicolumn{3}{c}{Participant-level macro F1} \\
+    \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+    EMG chain & \shortstack{Residual\\mains} & \shortstack{Ampl.\\spread} & Inv. & \shortstack{Wavelet\\CNN$^{a}$} & \shortstack{Logistic\\reg.$^{b}$} & \shortstack{Grad.\\boost.$^{b}$} \\
+    \midrule
+    60 Hz notch only (superseded) & 0.673 & $5.07\times$ & 20 & 43.5\% & 37.3\% & 38.8\% \\
+    Band-pass only (control) & 0.671 & $5.02\times$ & 20 & --- & 38.5\% & 39.2\% \\
+    \midrule
+    \textbf{Mains notch bank, 8 Hz (used)} & \textbf{0.012} & $\mathbf{2.97\times}$ & \textbf{0} & \textbf{72.8\%} & \textbf{63.9\%} & \textbf{61.3\%} \\
+    \bottomrule
+  \end{tabular*}
+  \begin{flushleft}\footnotesize
+  The notch bank was selected on residual mains power, a criterion specifiable in advance, not on classification score. A constant-$Q$ bank at the identical 13\% band cost scored marginally higher in screening, at 0.689 against 0.679 macro-F1 on the full 35-feature set, while leaving eight times the residual interference, and would have been selected by a score criterion.\\
+  $^{a}$Confirmatory nested LOSO, three seeds, five outer folds. Both rows are the fused condition, so the two are like-for-like on modality; the superseded row additionally searched the loss and learning rate inside each fold, which the corrected row fixed, so the comparison favours the superseded arm on both counts. The corrected EMG-only condition reported elsewhere in this paper scores 72.0\%.\\
+  $^{b}$Screening harness on the 28 EMG features: one fit per outer fold, no nested selection, feature set chosen after seeing these participants. Optimistic in level; reported here for the contrast and to show that it does not depend on model capacity.
+  \end{flushleft}
+\end{table*}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.76\linewidth]{Figures/v5/measurement_chain.png}
+  \caption{The mains-harmonic defect, in the terms a classification paper is read in. (a) Residual mains power for every candidate chain implemented and measured, against the 0.098 a white signal would score; the chain used is the lowest, and was chosen on this axis rather than on classification score. (b) Screening macro-F1 per held-out participant before and after the correction, on the 28 EMG features and identical folds. (c) The mechanism: each activity's median RMS divided by that participant's own resting RMS, five participants per condition, before (down triangles) and after (up triangles). (d) Between-participant amplitude spread, and the number of pairs in which one person's resting EMG exceeded another's active EMG.}
+  \label{fig:measurement_chain}
+\end{figure*}
+
+\subsection{RQ2: five-class performance on unseen participants}
+
+Averaged over the five held-out participants and three seeds, the model achieved 81.7\% accuracy, 77.6\% balanced accuracy, 72.0\% macro-F1 and a macro one-vs-rest ROC--AUC of 0.958 (Table~\ref{tab:results}). Seed-to-seed variation was small relative to variation between participants: accuracy 83.4\%, 81.5\% and 80.2\%; macro-F1 74.5\%, 69.9\% and 71.4\%; macro AUC 0.963, 0.953 and 0.957. Pooling held-out windows across participants, a descriptive summary only because the windows are correlated, gives 80.7\% accuracy and 71.5\% macro-F1 at a macro AUC of 0.948.
+
+Quiet rest reached 77.1\% precision, 91.4\% recall, an F1 of 83.6\% and a one-vs-rest AUC of 0.958. It was the second-best-separated class after chewing and the best-recalled of the five, which is the outcome the class was added to test: activity windows can be scored against a quiet non-event condition rather than only against one another.
+
+Per-class ROC curves are shown in Fig.~\ref{fig:roc}. One caution applies to reading them, and to reading the AUC column of Table~\ref{tab:results}. Movement reaches an AUC of 0.937, almost identical to clenching's 0.936, yet its precision is 34.4\% against clenching's 70.5\%. AUC is insensitive to how large a class is and precision is not~\cite{saito2015precision,davis2006relationship}, so a reader who looks only at AUC will substantially overestimate how usable the small classes are here. The per-class precision and recall columns are the honest view of the minority classes.
+
+\begin{table*}[t]
+  \centering
+  \caption{Five-class performance on the corrected signal. The upper block gives participant-level means, computed within each held-out participant and then averaged over the five, so its rows are directly comparable; the lower block gives per-class values on pooled held-out windows, averaged over three seeds, with one-vs-rest AUC computed from held-out probabilities. Values describe this five-participant dataset and are not population-level superiority tests.}
+  \label{tab:results}
+  \small
+  \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc@{}}
+    \toprule
+    Method / class & Accuracy & Precision & Recall & F1 & AUC & Windows \\
+    \midrule
+    \multicolumn{7}{l}{\emph{Participant-level means, five held-out participants $\times$ three seeds}}\\
+    \textbf{Wavelet CNN, 4-channel EMG} & \textbf{81.7\%} & \textbf{73.7\%} & \textbf{77.6\%} & \textbf{72.0\%} & \textbf{0.958} & 6,173 \\
+    Logistic regression, band energies$^{a}$ & 78.3\% & -- & -- & 63.9\% & 0.965 & 6,173 \\
+    Gradient boosting, band energies$^{a}$ & 74.8\% & -- & -- & 61.3\% & 0.914 & 6,173 \\
+    \midrule
+    \multicolumn{7}{l}{\emph{Wavelet CNN, per class, pooled held-out windows}}\\
+    Rest & -- & 77.1\% & 91.4\% & 83.6\% & 0.958 & 590 \\
+    Movement & -- & 34.4\% & 69.8\% & 46.0\% & 0.937 & 333 \\
+    Clenching & -- & 70.5\% & 66.0\% & 68.1\% & 0.936 & 799 \\
+    Grinding & -- & 67.9\% & 69.5\% & 68.6\% & 0.928 & 816 \\
+    Chewing & -- & 97.3\% & 85.8\% & 91.1\% & 0.981 & 3,635 \\
+    Macro average & 80.7\% & 69.4\% & 76.5\% & 71.5\% & 0.948 & 6,173 \\
+    \bottomrule
+  \end{tabular*}
+  \begin{flushleft}\footnotesize
+  Pooled-window macro AUCs are 0.948 for the CNN, 0.944 for logistic regression and 0.894 for gradient boosting.\\
+  $^{a}$Screening harness (Section~\ref{sec:screening}): one model fit per outer fold, no nested hyperparameter selection, feature set chosen after seeing these participants. Optimistic in level, which makes the network's margin over these rows a conservative estimate. Macro precision and recall are not reported for these rows because the harness stores a prediction ledger rather than a per-class table.
+  \end{flushleft}
+\end{table*}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.92\linewidth]{Figures/v5/five_class_roc_curves.png}
+  \caption{One-vs-rest ROC curves for the five classes, pooled over the held-out windows of seed 0, chosen by the fixed rule of lowest seed index rather than post hoc. Each curve depicts one trained model per fold, so legend values are that seed's; three-seed means are in Table~\ref{tab:results}. Because ROC is insensitive to class size, these curves flatter the two smallest classes relative to their precision in Table~\ref{tab:results}.}
+  \label{fig:roc}
+\end{figure}
+
+\subsection{Where the errors are}
+\label{sec:diagnostics}
+
+The highest per-class F1 was chewing's at 91.1\%, the lowest movement's at 46.0\%. Movement's is a precision problem rather than a detection problem: recall 69.8\% and AUC 0.937, but precision 34.4\%, because it is the smallest class at 333 windows, 5.4\% of the total, and absorbs 9.9\% of the eleven-times-more-numerous chewing windows. Clenching and grinding are the hardest pair to separate, with 19.5\% of clenching windows labelled grinding and 14.5\% of grinding windows clenching, together the majority of both classes' errors. Rest had the highest recall of any class at 91.4\%, and its dominant error was into grinding at 7.5\%, against 0.3\% into clenching, so confusion between quiet rest and the combined clenching and grinding group occurred in 7.7\% of rest windows. Those are the errors that carry most weight, because they approximate false alarms under the limited quiet-rest condition. For the seed in Fig.~\ref{fig:diagnostics}a the diagonal counts were 534 of 590 rest windows, 242 of 333 movement, 542 of 799 clenching, 589 of 816 grinding and 3,187 of 3,635 chewing.
+
+Table~\ref{tab:persubject} reports five-class results for each held-out participant and Fig.~\ref{fig:diagnostics}b shows the same values with their individual seeds. Accuracy ranged from 73.4\% to 90.7\%, macro-F1 from 63.2\% to 80.5\% and macro AUC from 0.904 to 0.981; the spread is substantial relative to the mean and is not explained by class balance alone. Two participants show why accuracy and AUC must be read together. P4 had the lowest accuracy alongside the second-highest AUC, at 74.0\% and 0.981: its windows are ranked well, and the loss is concentrated in where the decision boundaries fall rather than in the ability to order windows. P1 shows the opposite, with the lowest AUC of 0.904 and the lowest macro-F1 of 63.2\% at an accuracy no better than P4's, and it contributes the largest single share of windows at 1,692 of 6,173, so it dominates any pooled-window summary while counting as one of five at participant level. That is one concrete reason participant-level aggregation is primary here. With five participants the tabulated standard deviations describe the sample rather than a sampling distribution, and no population-level estimate follows from the mean.
+
+t-distributed stochastic neighbour embedding (t-SNE)~\cite{vandermaaten2008visualizing} of the 32-dimensional penultimate representation (Fig.~\ref{fig:tsne}) reproduces both error patterns. Chewing occupies several large, well-separated regions, consistent with its high AUC and food-dependent rhythmic structure; rest forms tight compact islands, as a low-variance quiet condition should; clenching and instructed grinding share adjacent, partly interleaved territory; and movement scatters along the borders of the larger classes. t-SNE distances are not metric, so the embedding is corroboration only.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.49\linewidth]{Figures/v5/confmatrx_5class.png}
+  \hfill
+  \includegraphics[width=0.39\linewidth]{Figures/v5/five_class_per_participant.png}
+  \caption{Held-out behaviour of the reference model. (a) Confusion matrix pooled across the five LOSO folds of seed 0, chosen by the fixed lowest-seed-index rule rather than by score, as counts and row-normalised recall. The dominant error patterns are the mutual clenching and grinding confusion and the leakage of chewing windows into the much smaller movement class. (b) Macro-F1 per held-out participant: bars are the mean over three seeds, open markers the individual seeds, and the label inside each bar that participant's held-out window count. Five participants cannot characterise population variability, so no generalisation claim follows from the mean.}
+  \label{fig:diagnostics}
+\end{figure*}
+
+\begin{table}[t]
+  \caption{Five-class performance for each held-out participant, averaged over three seeds.}
+  \label{tab:persubject}
+  \centering
+  \footnotesize
+  \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}lrrrr@{}}
+    \toprule
+    Held out & $n$ & Acc. & Macro F1 & Macro AUC \\
+    \midrule
+    Participant 1 & 1,692 & 73.4\% & 63.2\% & 0.904 \\
+    Participant 2 & 1,007 & 90.7\% & 72.6\% & 0.957 \\
+    Participant 3 & 1,133 & 83.7\% & 71.3\% & 0.967 \\
+    Participant 4 & 1,167 & 74.0\% & 72.2\% & 0.981 \\
+    Participant 5 & 1,174 & 86.7\% & 80.5\% & 0.980 \\
+    \midrule
+    Mean & 6,173 & 81.7\% & 72.0\% & 0.958 \\
+    SD & --- & 7.7 & 6.1 & 0.032 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.92\linewidth]{Figures/v5/tsne_5class.png}
+  \caption{t-SNE of the 32-dimensional learned penultimate representation for held-out windows, coloured by experimental class. Embeddings were recomputed from the saved fold checkpoints using only outer-test windows of one seed, so each held-out window appears exactly once.}
+  \label{fig:tsne}
+\end{figure}
+
+\subsection{Secondary analyses with rest}
+\label{sec:secondary}
+
+Excluding chewing leaves a four-class problem over rest, movement, clenching and grinding, which yielded 77.7\% accuracy, 75.7\% macro-F1 and a macro AUC of 0.942 at participant level, and 75.4\%, 75.4\% and 0.919 on pooled windows (Table~\ref{tab:sensitivity}). Removing chewing lowers accuracy by 4.0 points but raises macro-F1 by 3.7, because the metric is no longer dominated by a single large, easily separated class. A model trained separately on the same four classes reaches 77.7\% accuracy, 75.8\% macro-F1 and 0.942 AUC, agreeing to within a tenth of a point on macro-F1 and confirming that the post-hoc values are not an artifact of renormalisation.
+
+Treating clenching and grinding as the positive group and rest, movement and chewing as the comparison group yielded 92.5\% accuracy, 86.4\% precision, 84.8\% sensitivity, 95.3\% specificity, an F1 of 85.5\% and an AUC of 0.970 on pooled windows, and 93.0\% accuracy with a participant-level macro-F1 of 89.3\% and AUC of 0.968. Within the quiet-rest condition, 7.7\% of rest windows, being 45, 50 and 42 of 590 across the three seeds, fell on the tooth-contact side. This analysis includes a laboratory non-event class but does not measure detection in a continuous free-living stream. A 7.7\% per-window false-alarm rate at a 0.5-s decision interval corresponds to roughly 550 false alarms per hour if the background were quiet rest throughout, which is the quantity a deployable detector must report and one this design cannot estimate.
+
+\begin{table*}[t]
+  \caption{Secondary analyses computed post hoc from the held-out five-class predictions, averaged over three seeds. These re-read one trained model; they are not separately trained tasks.}
+  \label{tab:sensitivity}
+  \centering
+  \small
+  \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lcccccc@{}}
+    \toprule
+    Analysis & Accuracy & Precision & Recall & Specificity & F1 & AUC \\
+    \midrule
+    Excluding chewing$^{a}$ & 75.4\% & 74.9\% & 76.1\% & -- & 75.4\% & 0.919 \\
+    Collapsed binary$^{b}$ & 92.5\% & 86.4\% & 84.8\% & 95.3\% & 85.5\% & 0.970 \\
+    \bottomrule
+  \end{tabular*}
+  \begin{flushleft}\footnotesize
+  Values are pooled over held-out windows. The corresponding participant-level means are 77.7\% accuracy, 75.7\% macro-F1 and 0.942 AUC when chewing is excluded, and 93.0\%, 89.3\% and 0.968 for the collapsed binary analysis.\\
+  $^{a}$Macro precision, recall, F1 and one-vs-rest AUC across rest, movement, clenching and grinding, after removing chewing windows and renormalising the remaining four probabilities. A separately trained four-class model on the same windows and folds reaches 77.7\% accuracy and 75.8\% participant-level macro-F1.\\
+  $^{b}$Instructed clenching and grinding treated as positive; rest, movement and chewing treated as the comparison group. This is task discrimination, not clinical diagnosis.
+  \end{flushleft}
+\end{table*}
+
+\subsection{RQ3, part one: the learned representation against hand-engineered features}
+\label{sec:rq3}
+
+On the identical 6,173 windows and five outer folds, the screening harness reached 63.9\% macro-F1 at 78.3\% accuracy with logistic regression on 28 EMG band-energy features, and 61.3\% at 74.8\% with gradient boosting (Table~\ref{tab:results}). Every value is a participant-level mean computed exactly as the network's are. The network's 72.0\% macro-F1 exceeds these by 8.1 and 10.6 points and its accuracy by 3.4 and 6.9. Because the harness fits one model per fold with a feature set chosen after seeing these participants, the margin over it is a conservative estimate, and the direction is stable across two very different estimators.
+
+The AUC column does not follow, and the discrepancy is worth stating rather than omitting. Logistic regression reaches a participant-level macro AUC of 0.965 against the network's 0.958, and on pooled windows the ordering reverses, 0.944 against 0.948. Both differences are smaller than the network's own seed-to-seed AUC range of 0.953 to 0.963, so the two models rank held-out windows about equally well, and the network's advantage lies in where its decision boundaries fall once those windows are ranked. That is the same dissociation between ranking and thresholding that separates P1 and P4 in Section~\ref{sec:diagnostics}, and it is why macro-F1 rather than AUC was the prespecified selection objective.
+
+One qualification matters more than the margin: the advantage was much smaller before the measurement chain was corrected. Through the superseded chain, on the identical windows and folds, the network reached 43.5\% macro-F1 against 39.3\% for logistic regression and 40.1\% for gradient boosting on the 35-feature screening set. That is a margin of 4.2 and 3.5 points, obtained by a network that additionally searched its loss and learning rate and additionally carried a microphone branch matched by seven of the baselines' features. The near-parity had been read at the time as evidence that the architecture contributed nothing over band energies. The reading was correct about the numbers and wrong about the cause. When the dominant variance in a window is interference amplitude, a per-band pooled amplitude is all there is to extract, and a network whose sub-branches compute pooled band amplitudes cannot beat features that compute them directly. Once the interference is removed the margin roughly doubles, against baselines that no longer read a second channel.
+
+\subsection{RQ3, part two: four architectures on identical inputs}
+\label{sec:deep_baselines}
+
+Band energies are not the only alternative. A prespecified sweep contrasts four architectures under one training configuration and identical inputs. Every model receives the same four EMG channels on the same 6,173 windows, the same five outer folds and the same three seeds, because a table in which the proposed model receives one input set and the baselines another measures the inputs rather than the architecture. Earlier measurements of this sweep were taken through the defective chain and are superseded rather than reproducible; Table~\ref{tab:architectures} reports it on the corrected signal.
+
+The four models fall into two groups by what they see. Two read the signal through the db4 wavelet decomposition of Section~\ref{sec:filter}: the compact reference model, and an extended member of the same family that keeps the time axis, summarises each band by mean, standard deviation and maximum rather than by mean alone, and carries a modulation-spectrum head so that a burst and relaxation rhythm at 1--2~Hz is representable within a single window at all. The other two read the signal without that decomposition: an early-fusion CNN on the raw channels, and a bidirectional LSTM.
+
+The grouping is the result. Both wavelet models place above both non-wavelet models, and the ordering does not follow parameter count. The early-fusion CNN reads the same four channels through 19,029 parameters, 3.2 times the compact model's 5,901, and reaches 68.9\% macro-F1 against 72.2\%; the bidirectional LSTM is worse again at 60.2\% with 10,053 parameters. The largest model in the table places third and the smallest places second. On these recordings, capacity applied to the raw waveform is no substitute for an explicit band decomposition.
+
+Within the wavelet family, the extended model is the stronger of the two: 75.0\% macro-F1 at a macro AUC of 0.974, against 72.2\% and 0.954. The gap is small but consistent. Every one of its three seeds exceeds every one of the compact model's on macro-F1, at 0.736--0.762 against 0.705--0.734, and the two AUC ranges do not overlap at all, at 0.971--0.976 against 0.948--0.958, so the ordering is not an artifact of which seeds were drawn. It is nevertheless bought with parameters, 17,981 against 5,901, and with latency, 2.21~ms against 1.02~ms, and it is not uniform across participants: the extended model gains 7.0 points of macro-F1 on P1, 6.6 on P3 and 7.5 on P5, but loses 6.7 on P2 and ties on P4.
+
+\paragraph{Why the compact model is the one characterised in detail.} A reader may reasonably ask why a paper that measures a better model does not report it as its headline. Three reasons, in order of weight. First, the evidence does not support a headline claim: a 2.8-point mean difference that rests on three of five participants is a direction, not an effect size, and this study has no power to distinguish the two. Second, the compact model buys its 96\% of the extended model's macro-F1 at 33\% of the parameters and 46\% of the forward-pass latency, which is the trade a wearable design would weigh and not obviously the worse side of it. Third, and most importantly, the two are not competitors. The extended model is the compact model with the time axis retained plus two additions, on the same wavelet front end and the same bands, so its advantage is evidence for this paper's representational argument rather than against its model: what separated all four architectures was which information each could represent. Both are reported, in the same table, from the same run. The detailed diagnostics in Sections~\ref{sec:diagnostics} and~\ref{sec:cost} characterise the compact model because it is the reference implementation; regenerating them for the extended model is the obvious next step and is not attempted here.
+
+\begin{table*}[t]
+  \centering
+  \caption{RQ3. Four architectures on identical inputs: the same 6,173 windows, the same five outer folds and the same three seeds, every model reading the same four EMG channels under one fixed training configuration. Rows are grouped by front end, and within each group ordered by macro-F1. Values are participant-level means $\pm$ the standard deviation across the three seeds, computed exactly as elsewhere in this paper. Parameters are trainable parameters read from the instantiated model; ``Forward'' is the median forward pass for one window at batch size 1 on an Intel CPU. Both wavelet models place above both raw-signal models, and the largest model in the table places third.}
+  \label{tab:architectures}
+  \footnotesize
+  \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lrrcccc@{}}
+    \toprule
+    Architecture & Params & Forward & Accuracy & Bal.\ acc. & Macro F1 & Macro AUC \\
+    \midrule
+    \multicolumn{7}{l}{\emph{db4 wavelet front end}}\\
+    Wavelet CNN, extended$^{a}$ & 17,981 & 2.21 ms & $\mathbf{86.1 \pm 1.1}$\% & $\mathbf{78.9 \pm 0.9}$\% & $\mathbf{75.0 \pm 1.3}$\% & $\mathbf{0.974 \pm 0.003}$ \\
+    Wavelet CNN, compact (reference)$^{b}$ & 5,901 & 1.02 ms & $81.0 \pm 2.2$\% & $77.4 \pm 1.0$\% & $72.2 \pm 1.5$\% & $0.954 \pm 0.006$ \\
+    \midrule
+    \multicolumn{7}{l}{\emph{No wavelet decomposition}}\\
+    Early-fusion CNN, raw signals & 19,029 & 0.20 ms & $79.0 \pm 0.8$\% & $74.3 \pm 1.3$\% & $68.9 \pm 1.5$\% & $0.949 \pm 0.004$ \\
+    Bidirectional LSTM & 10,053 & 1.16 ms & $71.5 \pm 3.3$\% & $66.4 \pm 2.5$\% & $60.2 \pm 2.6$\% & $0.898 \pm 0.013$ \\
+    \bottomrule
+  \end{tabular*}
+  \begin{flushleft}\footnotesize
+  $^{a}$Registered in the run as \texttt{dual\_branch\_temporal\_cnn}. It is the reference model with the time axis kept: the same db4 decomposition and the same $A_4$, $D_3$, $D_1$ bands, plus mean, standard-deviation and maximum pooling per band in place of the mean alone, plus a modulation-spectrum head so that burst and relaxation rhythm is representable within a window. Its advantage over the reference model is consistent across seeds but rests on three of the five participants, and costs three times the parameters and 2.2 times the forward-pass latency.\\
+  $^{b}$Registered as \texttt{dual\_branch\_wavelet\_cnn}. This row is the sweep's own measurement of the reference model, not the confirmatory run's, which reached 72.0\% macro-F1 (Table~\ref{tab:results}). The two agree to within 0.2 points of macro-F1 and 0.4 of accuracy on a different code revision, which is an independent reproduction of the headline model; keeping every row of this table inside one run matters more here than matching the headline table exactly.
+  \end{flushleft}
+\end{table*}
+
+\subsection{RQ4: three design constraints larger than the architecture}
+\label{sec:constraints}
+
+RQ1 showed that one element of the measurement chain outweighed every modelling choice. Three elements of the experimental and analysis design can be priced from the same archive, and two are worth more than the 8.1-point architectural margin of Section~\ref{sec:rq3}. All three are screening measurements on the identical windows and folds, reported for direction and magnitude rather than as results.
+
+\textbf{The one-second window is a binding constraint, not a tuned parameter.} Chewing and grinding are distinguished from clenching partly by rhythm: burst and relaxation cycles at roughly 1--2~Hz, visible in Fig.~\ref{fig:signal_comparison}c, which a 1.0-s window can barely contain. Averaging held-out probabilities over consecutive windows raises screening macro-F1 monotonically from 0.730 at 1.0~s of context to 0.744 at 1.5~s, 0.769 at 2.5~s, 0.787 at 3.5~s and 0.804 at 5.5~s, before flattening at 0.799 by 8.5~s (Fig.~\ref{fig:design}a). A gain of 7.4 points from context alone is comparable to the gain from the architecture and larger than any other modelling change we evaluated. It must be read strictly as a trial-level secondary analysis, because every recording here contains a single condition, so averaging within a recording approaches a majority vote over a homogeneous trial: valid evidence that one second is too short, and invalid as continuous-stream detection.
+
+\textbf{The window and guard rule interacts with how participants used the trigger.} Participants marked trigger intervals at very different granularity, with 67 runs of median 8.7~s for P1 against 167 runs of median 1.7~s for P2, and a 1.0-s window with a 0.25-s guard on each side needs a run longer than 1.5~s to emit even one window. The consequence is severe and uneven. P1's clenching trials, marked as 14 long runs of median 9.0~s, emit 376 windows, while P2's, marked as 59 runs of median 1.7~s, emit 53, and P2's movement trials emit 11. Holding the window at 1.0~s and sweeping only the guard from 0 to 0.5~s moves the total from 6,779 to 5,610 windows but moves the smallest participant and class cell from 50 to 1, whereas shortening the window to 0.5~s with a 0.1-s guard yields 13,983 windows and a smallest cell of 128 (Fig.~\ref{fig:design}b). The reported policy is a deliberate compromise between two pressures that pull in opposite directions. The real resolution is to stop forcing a fixed window onto variable-length trigger runs, and to standardise trigger use at collection time.
+
+\textbf{Normalisation scope is worth about as much as the architecture.} Under the strict scope used for every confirmatory number here, the screening classifier reaches 0.639 macro-F1; standardising each participant's features by that participant's own unlabelled distribution raises it to 0.730, a gain of 9.1 points and slightly more than the network's margin over the same features (Fig.~\ref{fig:design}c). This is transductive test-time adaptation, not label leakage: it reads the held-out participant's feature distribution but never their labels. It is nevertheless excluded from every reported result, because it would require a per-user fitting session and therefore describes a different product than a model that works out of the box. A robust variant of the same scope, using median and interquartile range, gains only 0.9 points, and normalising per recording destroys the task entirely at 0.036 macro-F1, because each recording contains one condition and per-recording standardisation removes precisely the between-condition amplitude difference the task depends on.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.88\linewidth]{Figures/v5/design_constraints.png}
+  \caption{Three design constraints, all measured on identical windows and folds with the screening harness and the 28 EMG features. (a) Screening macro-F1 against seconds of temporal context aggregated within a recording; monotone across the range, so the 1.0-s window is a constraint rather than a tuned parameter. This sweep is trial-level: each recording holds one condition, so it is a labelled secondary analysis and not stream detection. Its 1.0-s starting value is the per-participant scope of panel (c), not the strict scope. (b) Every window and guard setting the audit swept: total analysable windows against the smallest participant and class cell, reported policy circled. The curves separate by window length because trigger granularity differed sharply between participants, at 67 runs of median 8.7~s for P1, 167 of 1.7~s for P2, 132 of 2.9~s for P3, 141 of 2.9~s for P4 and 116 of 3.9~s for P5, so one rule emits very different counts from each. (c) Normalisation scope: the transductive per-participant scope is worth more than the architecture, and is used by no reported number.}
+  \label{fig:design}
+\end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.78\linewidth]{Figures/v5/signal_comparison_emg.png}
+  \caption{Six-second excerpts of one participant's quiet rest, instructed grinding and gum chewing after the corrected chain, on a common scale, with the 50~ms RMS envelope beside each. (a) Rest is quiet. (b) Grinding produces sustained activation without a clear burst and relaxation rhythm. (c) Chewing produces rhythmic bursts separated by relaxation intervals at roughly 1.4~Hz. The shaded interval is one 1.0-second analysis window to scale: it holds barely one chewing cycle, the constraint quantified in Fig.~\ref{fig:design}a.}
+  \label{fig:signal_comparison}
+\end{figure*}
+
+\subsection{Training behaviour and computational cost}
+\label{sec:cost}
+
+Because each fold's final model is refit for a fixed epoch budget chosen inside that fold, there is no early stopping and no validation set at refit time. The curves in Fig.~\ref{fig:loss_curves} are training-fit diagnostics and the held-out participant appears in none of them. Training loss had largely flattened by the end of each budget. The gap between final training-fit macro-F1 and the corresponding held-out macro-F1 averaged 0.144 and ranged from $-0.027$ to 0.291; per participant it was 0.276 for P1, 0.153 for P3, 0.129 for P4, 0.120 for P2 and 0.040 for P5. That ordering tracks the per-participant scores of Table~\ref{tab:persubject} almost exactly, with the largest gap belonging to the participant whose windows are the most numerous and the least well ranked, which is the signature of between-participant variation rather than optimisation failure.
+
+Three latencies must be kept separate. The input-context latency is 1000~ms: the window length, and therefore the earliest point at which any decision can exist. The decision update interval is 500~ms, the stride. The processing latency, meaning the forward pass for one pre-segmented window at batch size 1 on an Intel CPU, has a median of 1.02~ms and a 95th percentile of 1.06~ms, rising to 1.24~ms once amortised per-window preprocessing is included, which puts the earliest possible decision at about 1001~ms. The same bench measures the other three architectures of Table~\ref{tab:architectures} on the same four channels: 0.20~ms for the early-fusion CNN, 1.16~ms for the bidirectional LSTM, and 2.21~ms for the extended wavelet CNN, whose modulation-spectrum head makes it the slowest of the four as well as the most accurate. Compute time alone is not detection latency, and none of these measurements supports a wearable or real-time claim: no streaming implementation exists, the production chain is zero-phase and therefore acausal, and the measurements were taken on laptop and desktop hardware. Power consumption, end-to-end latency, wireless synchronisation and wearable reliability remain unmeasured.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.74\linewidth]{Figures/v5/training_curves_5class.png}
+  \caption{Refit training loss (a) and training-fit macro-F1 (b) for all fifteen fold and seed combinations, coloured by held-out participant; line style encodes seed, with solid 0, dashed 1 and dotted 2. Each refit runs for the epoch budget chosen inside its own fold, so curves end at different epochs. The held-out participant contributes to no curve and is scored once, after training ends.}
+  \label{fig:loss_curves}
+\end{figure*}
+
+\subsection{What determines performance}
+\label{sec:budget}
+
+The preceding subsections priced six choices against each other on the same 6,173 windows and the same five outer folds. Table~\ref{tab:budget} collects them on one scale.
+
+Read together they give a consistent ordering, and the ordering is the paper's main result. Signal quality sets a ceiling that nothing above it can raise. Through the superseded chain the best model here scored 43.5\% macro-F1, well below the 61.3\% that the weakest baseline reaches on the corrected signal, so no choice of architecture, features or estimator could have recovered what the filter had already passed through untouched.
+
+Above that ceiling, what a model can represent matters more than how large it is. The learned wavelet representation beats the band energies it is built from by 8.1 points; adding an explicit representation of burst and relaxation rhythm gains a further 2.8; and applying 3.2 times the parameters to the raw waveform instead loses 3.3. Two choices fixed before any model was trained fall in the same range or above it. Temporal context is worth 7.4 points and normalisation scope 9.1, and neither is a modelling decision: the first is a property of how long the analysis window is allowed to be, and the second of whether the product is one the user calibrates before use.
+
+Three cautions apply to reading the table, and they matter enough to state in the text rather than only in a note.
+
+The entries are not additive. Each is measured against its own baseline, and two of them share one: the temporal-context sweep was run under the per-participant normalisation scope, so its 1.0-s starting value of 0.730 is the same 0.730 that scope earns in the row above it. Adding 7.4 to 9.1 would double-count.
+
+The entries do not all come from the same harness. Three are confirmatory nested LOSO and three are screening or sweep measurements, which are directionally reliable and optimistic in level. The harness is named for every row, and no row should be compared across harnesses to a precision finer than a few points.
+
+The magnitudes are properties of this cohort and this laboratory, not general effect sizes. What we claim generalises is the ordering and the practice of measuring it, not the numbers themselves. A laboratory with clean mains would find the first row worth nothing at all, which is precisely why it needs to be measured rather than assumed in either direction.
+
+\begin{table*}[t]
+  \centering
+  \caption{What determines performance. Six choices priced on the same 6,173 windows and the same five outer folds, in participant-level macro-F1. The entries are not additive and are not all measured by the same harness; see the notes and Section~\ref{sec:budget}. ``Reported'' states whether the more favourable setting is the one used for the results in this paper.}
+  \label{tab:budget}
+  \footnotesize
+  \begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lllrl@{}}
+    \toprule
+    Choice & Change measured & Harness & $\Delta$ macro F1 & Reported \\
+    \midrule
+    Signal quality & 60 Hz notch $\rightarrow$ harmonic notch bank & Confirmatory$^{a}$ & $+29.3$ & Yes \\
+    Normalisation scope & Strict $\rightarrow$ per-participant & Screening$^{b}$ & $+9.1$ & No$^{c}$ \\
+    Learned representation & Band energies $\rightarrow$ wavelet CNN & Conf./screen.$^{d}$ & $+8.1$ & Yes \\
+    Temporal context & 1.0 s $\rightarrow$ 5.5 s within a trial & Screening$^{b,e}$ & $+7.4$ & No$^{e}$ \\
+    Rhythm representation & Compact $\rightarrow$ extended wavelet CNN & Arch.\ sweep & $+2.8$ & Secondary \\
+    Capacity, raw signal & Wavelet CNN $\rightarrow$ early-fusion ($3.2\times$) & Arch.\ sweep & $-3.3$ & No \\
+    \bottomrule
+  \end{tabular*}
+  \begin{flushleft}\footnotesize
+  $^{a}$Nested LOSO, three seeds, five outer folds, both arms the fused condition on byte-identical windows, folds and labels (Table~\ref{tab:filter}). The two much simpler screening estimators move by 22 to 27 points over the same change.\\
+  $^{b}$Screening harness (Section~\ref{sec:screening}): one fit per outer fold, no nested selection, feature set chosen after seeing these participants. Optimistic in level, reliable in direction.\\
+  $^{c}$Excluded by design. It reads the held-out participant's unlabelled feature distribution, which is legitimate, but presumes a per-user fitting session and therefore describes a different product.\\
+  $^{d}$The network is confirmatory and the baseline is screening, so this row crosses harnesses in the conservative direction: the screening baseline is optimistic, which makes the margin an underestimate.\\
+  $^{e}$Trial-level secondary analysis. Every recording here holds one condition, so aggregating within a recording approaches a majority vote over a homogeneous trial. Valid as evidence that 1.0~s is too short, invalid as stream detection. Its 1.0-s baseline is the per-participant scope of the second row, so these two rows share a baseline and must not be summed.
+  \end{flushleft}
+\end{table*}
+
+\section{Discussion}
+
+\subsection{What this work contributes}
+
+The first contribution is the pipeline itself, taken as a whole rather than as a sequence of parts. It runs from a raw recording to a held-out prediction with the signal validated on the way in, the wavelet representation checked against the filter that produced it, the evaluation nested so that model selection cannot see the test participant, and three guards that refuse rather than warn. Every number in this paper was regenerated from a saved prediction ledger in which each held-out window appears exactly once, rather than transcribed from a training log. That is not a novel algorithm and we do not present it as one. It is a working example of what an auditable pipeline in this application looks like, at a level of detail another group can copy.
+
+The second is the five-class result. Four channels of surface EMG and 5,901 parameters separate five instructed conditions at 81.7\% accuracy and 72.0\% macro-F1 on participants the model has never seen. Including a quiet-rest class matters more than it may appear: most work in this area classifies activities against each other, which cannot say anything about false alarms, whereas rest here was the best-recalled class of the five and the 7.7\% of rest windows assigned to clenching or grinding is the closest analogue of a false-alarm rate this design can produce. It is also, for that reason, the most decision-relevant number in the paper.
+
+The third is the budget of Table~\ref{tab:budget}, and it is the contribution we would most like to see adopted. To our knowledge this literature contains no other account that places signal quality, learned representation, architecture, temporal context and normalisation scope on one comparable scale, measured on identical windows and folds. Without such an account, a reported accuracy cannot be attributed to anything, and a reader who wants to improve on it has no way to know where to spend effort. With one, the answer here is unambiguous: fix the signal, then choose what the model can represent, and treat parameter count as the least productive axis of the three.
+
+The fourth is two checks that cost a single pass over the data and that any group can adopt tomorrow. Draw the filter response over the measured spectrum of the actual recordings rather than alone, and publish the resulting interference statistic beside the accuracy. Fingerprint every channel of every recording, group the fingerprints, and confirm that no held-out participant's signal appears in its own training set.
+
+\subsection{What the ordering means}
+
+The single sentence we would keep from this study is that what a model can represent mattered more than how large it was, and that signal quality set the ceiling for both.
+
+The architecture sweep makes the first half concrete in an unusually clean way, because its four models differ mainly in what they are able to see. The two that decompose the signal into wavelet bands placed first and second; the two that do not placed third and fourth; and parameter count ran almost opposite to performance, with the largest model third and the smallest second. Within the wavelet pair, the model that could also represent a burst and relaxation rhythm beat the one that could not. Nothing in that ordering rewards capacity for its own sake.
+
+That result converges with RQ4 from a different direction. The rhythm the extended model can represent within a window is the same information the 1.0-s window withholds, and Section~\ref{sec:constraints} prices access to it at 7.4 points, larger than the 2.8 the architecture recovers by encoding it more cleverly. The two measurements agree that the binding limitation is informational rather than architectural. A next study that lengthened the analysis window would likely gain more than one that enlarged the model, and it would do so at lower cost.
+
+The second half of the sentence is what RQ1 establishes. It is worth being precise about the claim, because it is easy to overstate. We are not claiming that mains correction is generally worth 29.3 points; in a laboratory with clean recordings it is worth nothing, and the magnitude here is a property of this cohort and this room. What we are claiming is that the ceiling exists, that its height is measurable, and that nothing above it can be interpreted until it has been measured. The architectural comparison in Section~\ref{sec:rq3} demonstrates the consequence directly: through the defective chain, the network and a linear model on band energies were within four points of each other, which was read at the time as evidence that the architecture contributed nothing. The reading was correct about the numbers and wrong about the cause, and an architecture was nearly dismissed on the strength of a filter.
+
+\subsection{Why signal validation belongs inside the pipeline}
+
+How the defect presented deserves as much attention as its size, because the presentation is what makes it general.
+
+It did not look like a signal problem. It looked like between-participant heterogeneity: two of five held-out participants near chance, three in the normal range, a spread of 70 points of macro-F1. That is the most familiar failure mode in this literature and the one that motivates transfer learning, per-user calibration and larger cohorts. All three would have been reasonable responses and none would have worked. A defect in a shared measurement chain expresses itself as apparent variation between the people measured through it, because interference amplitude varies with electrode impedance, cable routing and session rather than with physiology~\cite{deluca2010filtering,besomi2019consensus}, and LOSO then attributes that variation to the person held out. It presents as precisely the input-distribution shift that the domain-generalisation literature sets out to absorb~\cite{wang2022generalizing,kouw2021review}, which is why the natural responses are the wrong ones here. The shift was a property of the instrument, not of the people, and no amount of adaptation would have recovered a signal the filter had already passed through untouched.
+
+Nothing about the code was wrong. It implemented exactly the filter it was asked for, the filter was the one the literature recommends~\cite{chowdhury2013surface,raez2006techniques}, and its response plot is textbook-correct in isolation. Nothing was untested, unversioned or irreproducible. What was missing was one comparison, the filter response drawn over the measured spectrum of the recordings, and one statistic, the share of in-band power sitting within a few hertz of each mains multiple. This failure mode is adjacent to, but distinct from, the leakage and validation errors catalogued in clinical machine learning~\cite{saeb2017need,kapoor2023leakage,varoquaux2022machine}: nothing leaked and the protocol was correct, but the input was not what the analysis assumed. That is the argument for making validation a stage of the pipeline that can refuse, rather than a review step a careful person performs once.
+
+\subsection{Reading the classification result}
+
+The chewing class deserves a double reading. It supplied most of the windows and achieved the highest F1 of any class, and excluding it lowered participant-level accuracy while raising macro-F1. The direction of those two changes is the point: a headline accuracy over this class distribution is carried substantially by the easiest and largest class, whereas macro-F1 rises once that class is removed because the remaining four are more evenly sized. Reporting both analyses, and macro-F1 alongside accuracy throughout, is what stops the largest class carrying the summary.
+
+The clenching and grinding split was retained for a related reason. Clenching is static isometric loading and grinding is lateral excursion under load~\cite{lan2022comparative}, and a system meant to characterise tooth-contact activity should be tested on whether it resolves them rather than credited for collapsing them. It is also the hardest distinction in the problem, and a 1-second window from a grinding bout passing through a static phase may legitimately carry either label, so part of that confusion is label ambiguity rather than model error.
+
+Comparison with the greater-than-90\% accuracy reported by Sonmezocak and Kurt using EMG alone~\cite{sonmezocak2021detection} is not like-for-like: their classes were jaw opening, clenching, rhythmic grinding and fatigue or pain against our five, and dataset composition, preprocessing, sample size and validation design all differ. Every number here is measured on a participant the model has never seen; a within-participant or window-shuffled split of the same data would score considerably higher without measuring anything about a new user~\cite{saeb2017need,little2017using}. The two studies answer different questions.
+
+\subsection{What a next study should do}
+
+Section~\ref{sec:constraints} priced three choices this design fixed early, and two proved worth more than the architecture, which is the practical message for anyone planning a follow-on collection.
+
+Temporal context is the clearest. Performance rises monotonically from 1.0 to 5.5~s, so the 1-second window is a limitation of this analysis rather than an optimum it found. A next-stage design should classify variable-length segments directly or aggregate over a declared context, and must then evaluate on continuously varying activity rather than single-condition trials, because the aggregation measured here is a majority vote over a homogeneous trial and cannot be presented as event detection.
+
+Trigger granularity is the least obvious constraint and the easiest to fix. Because participants marked bouts as they saw fit, one produced seven times as many clenching windows as another from the same instructed task, and the smallest participant and class cell holds 11 windows. That is an instruction problem, not a modelling one, and it is removable at source by standardising trigger use, by recording continuous condition intervals rather than participant-marked bouts, or both.
+
+Normalisation scope is a product decision disguised as a preprocessing one. Standardising by the held-out participant's own unlabelled distribution uses no labels and is entirely legitimate, but it presumes a per-user fitting session and therefore describes a device the user calibrates rather than one that works immediately. We report the strict scope throughout because it supports the weaker and more defensible claim, and report the gap so that a future design can decide deliberately rather than by default~\cite{besomi2020consensus}.
+
+Setting is the remaining gap. Laboratory repetitions do not capture the frequency, duration or day-to-day variability of behaviour outside the laboratory, and awake bruxism is currently characterised mainly by ecological momentary assessment rather than by any instrument~\cite{bracci2018frequency}, while multi-day, 24-hour home EMG recording has been shown to be feasible and illustrates its own difficulties~\cite{colonna2023electromyographic,lobbezoo2020consensus}. A next-stage awake study should therefore combine multi-day EMG with a clearly defined background class and blinded annotation of candidate episodes, and should report day-level and participant-level performance including false positives per hour. No conclusion about sleep follows from these awake laboratory tasks: a sleep study would require overnight data, appropriate sleep staging and event criteria, comparison with a suitable reference such as polysomnography or validated portable assessment, and repeated nights to evaluate night-to-night variability~\cite{lavigne1996sleep,casett2017validity,cidverdejo2024instrumental}. Separate models may be required for awake and sleep contexts.
+
+\subsection{Validity and limitations}
+
+The principal limitation is the cohort size, at $N=5$. The 6,173 overlapping windows supply many optimisation examples but do not replace independent participants: adjacent windows share half their samples and one participant contributed 27\% of them. Window-level confidence intervals or tests would overstate precision and are deliberately not reported, and LOSO does not establish external generalisation from five people~\cite{varoquaux2018cross}. The between-participant spread is itself the clearest evidence that a five-person mean is not a population estimate, and age, facial anatomy, subcutaneous tissue, dentition, electrode placement, skin impedance, behaviour intensity and prior diagnosis may all affect the signal~\cite{besomi2019consensus,hermens2000development}.
+
+The budget of Table~\ref{tab:budget} inherits that limitation and adds two of its own. Its entries are not additive and share baselines in one place, as Section~\ref{sec:budget} states, and three of its six rows are screening measurements that are optimistic in level. It should be read as an ordering with approximate magnitudes, not as a decomposition of variance.
+
+The RQ1 contrast likewise comes from one cohort in one laboratory, and its magnitude is not a general effect size for mains correction: what generalises is the mechanism and the check, not the 29.3 points. Two features bound it in opposite directions. Both arms are the fused condition, so the superseded arm carried an extra input channel and additionally searched its loss and learning rate, making the gap conservative; but the two runs differ in codebase version, and although the window set, fold assignment and labels are byte-identical and were verified as such, we cannot exclude an unrecorded contributing difference. The screening arms, which share one code path across both chains, move by a similar amount and are the cleaner evidence there. Some declared options were also left unexercised: temperature scaling is implemented but unapplied, so held-out scores must not be read as probabilities~\cite{guo2017calibration} though every AUC is unaffected, and the per-participant normalisation scope and temporal aggregation of Section~\ref{sec:constraints} are excluded from every reported result for the reasons given there.
+
+Task coverage and label precision bound what the classes mean. The tasks cover tooth-contact clenching and grinding but not bracing or thrusting without tooth contact~\cite{verhoeff2025definitions}, and the prior diagnoses were not phenotyped for this study~\cite{manfredini2024standardised}. Class membership rests on a button press confirmed by the experimenter: muscle activity preceded the marker at four of every five onsets, and while the 0.25-s guard exceeds the median error in the harmful direction and covers the 95th percentile, 7\% of trial-leading windows may still carry a partially mislabelled edge. The grinding condition's acquisition token was a filename label chosen at recording time, so that class is reported throughout as instructed grinding. Because every activity was performed on instruction, it may be more regular, longer or more forceful than spontaneous activity, a bias in the optimistic direction~\cite{farella2008masticatory}, and no spontaneous episode was verified against a reference standard.
+
+Including quiet rest removes one limitation of an activity-only design, but the background data remain incomplete. Rest was recorded in a controlled laboratory and did not systematically sample speaking, swallowing, facial expression, head movement, coughing, eating outside the scripted task, environmental noise or other free-living behaviour. The five-class analysis can therefore estimate confusion against quiet rest but not false alarms per hour during unrestricted use, because the denominator that matters there is unrestricted behaviour and this design contains none. Finally, the computational measurements were taken on laptop and desktop hardware rather than a wearable prototype, and the acausal filter chain means they do not describe a streaming system.
+
+\section{Conclusion}
+
+This five-participant proof-of-concept study built one pipeline for classifying jaw activity from surface EMG and then measured what each of its stages was worth. On participants it had never seen, the pipeline separated quiet rest and four instructed jaw activities at 81.7\% accuracy and 72.0\% macro-F1 in 5,901 parameters, with quiet rest the best-recalled class.
+
+The ordering it produced is the more durable result. Signal quality set a ceiling: because the acquisition hardware had already removed the 60-Hz fundamental and the surviving interference was harmonic, the conventional chain was indistinguishable in effect from applying no mains filter at all, and correcting it moved the matched network by 29.3 points of macro-F1 on byte-identical windows, folds and labels. Above that ceiling, what a model could represent mattered more than its size. The two architectures that decomposed the signal into wavelet bands placed above the two that did not, the largest of the four placed third, and adding an explicit representation of chewing rhythm gained more than tripling the parameter count on the raw waveform. Two choices fixed before any model was trained, temporal context and normalisation scope, were each worth as much as the architecture or more.
+
+The transferable recommendation costs one pass over the data. Report a measured interference statistic beside every accuracy, and draw filter responses over the measured spectrum of the recordings rather than alone. Fingerprint every channel of every recording, since a hash of its sorted samples suffices and is invariant to circular rotation, then group the fingerprints and confirm that no held-out participant's signal appears in its own training set. Defects of both kinds are invisible in any single file and in any amount of unit testing, because the code is correct, the pipeline reproducible and the figures right, and nothing in the figure set compares the analysis to the data it was applied to.
+
+This study does not validate a bruxism detection device. Quiet-rest windows are included, but there is no bracing or thrusting, no unrestricted background behaviour, no spontaneous awake episode, no sleep recording and no independent reference standard. The defensible conclusion is technical: surface EMG with modality-specific wavelet decomposition merits further evaluation for distinguishing instructed jaw activities from quiet rest, in a larger, phenotyped, multi-day continuous-recording study, and any such study should publish the measured properties of its signals alongside the accuracy it obtained from them.
+
+\backmatter
+
+\section*{Data availability}
+The datasets generated and/or analysed during the current study are not publicly available because of participant-privacy restrictions but are available from the corresponding author on reasonable request, subject to institutional and ethical requirements.
+
+\section*{Code availability}
+The custom code used for signal preprocessing, wavelet decomposition, model training and evaluation is available from the corresponding author on reasonable request. Every number and figure in this manuscript was regenerated from a saved artifact rather than transcribed. The confirmatory five-class results come from the EMG conditions of run \texttt{modality\_and\_no\_chewing\_}\allowbreak\texttt{20260810T020642\_cead62e4}, configuration hash \texttt{cead62e4}, manifest hash \texttt{7ebbcc8d}, window-index hash \texttt{b2cf690c}. The architecture sweep of Section~\ref{sec:deep_baselines} comes from run \texttt{baselines\_emg\_only\_20260816}, which carries a different manifest hash (\texttt{9d93667b}) and window-index hash (\texttt{9941fe48}) because the manifest schema was extended, after the channel-integrity audit, with the channel-integrity columns and the cross-recording fingerprint pass described in Section~\ref{sec:safeguards}. The window set is nevertheless the same one: comparing the two prediction ledgers window by window returns the identical 6,173 windows, the identical class labels and the identical held-out-participant assignment, with no window present in one and absent from the other. Each prediction ledger records every held-out window exactly once per task, modality and seed, together with its full probability vector, the source commit, and hashes of the resolved configuration, the data manifest, the window index and the model checkpoint. The screening measurements for RQ1, RQ3 and RQ4 come from the same window index, so every comparison in this paper was evaluated on the identical set of windows. Run bundles retain the hashes they were produced under and still reproduce. The participant-level values in Table~\ref{tab:architectures} were recomputed from that run's saved prediction ledgers into \texttt{outputs/}\allowbreak\texttt{summaries/}\allowbreak\texttt{baselines\_emg\_only\_}\allowbreak\texttt{20260816}, and the parameter counts and latencies in Table~\ref{tab:architectures} and Section~\ref{sec:cost} from \texttt{outputs/benchmarks/}\allowbreak\texttt{benchmark\_emg\_only.json}, measured on the four EMG channels through the corrected filter chain on an otherwise idle machine. An earlier benchmark taken before the filter correction is retained but is not the source of any number reported here.
+
+\section*{Funding declaration}
+Research reported in this publication was supported by an award from the Rhode Island Life Science Hub Small Grant Program (Principal Investigator T. A. Walls; Co-Investigators R. Abiri and M. Furmanek). The project was also partially supported by National Science Foundation grant 2245558 (Principal Investigator R. Abiri).
+
+\section*{Acknowledgements}
+We thank University of Rhode Island undergraduate and graduate students Anjolaoluwa Akingbile, Jessica Constantine and Nathan DeSalvo, who located and summarised the functions of bruxism devices before this project.
+
+\section*{Author contributions}
+M.H.F.: methodology, software, analysis, writing---original draft, and writing---review and editing. A.R.: protocol development, software, data curation, data collection, formal analysis, and review and editing. R.S.: methodology, validation, and writing---review and editing. M.P.F.: conceptualization and study design, research-grant development, protocol development, and manuscript revision. R.A.: conceptualization, project administration, resources, supervision, and writing---review and editing. T.A.W.: conceptualization, research-grant authorship, protocol development, project oversight, and manuscript revision. All authors reviewed and approved the final manuscript.
+
+\section*{Competing interests}
+The authors declare no competing interests.
+
+\bibliography{refs}
+
+\end{document}
